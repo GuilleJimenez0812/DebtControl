@@ -6,9 +6,10 @@ import (
 
 type UserModel struct {
 	ID           string    `gorm:"primaryKey;type:varchar(64)"`
-	Email        string    `gorm:"uniqueIndex;type:varchar(255);not null"`
+	Email        string    `gorm:"type:text;not null;serializer:encrypted"`
+	EmailHash    string    `gorm:"uniqueIndex;type:varchar(64)"`
 	PasswordHash string    `gorm:"type:text;not null"`
-	FullName     string    `gorm:"type:varchar(255);not null"`
+	FullName     string    `gorm:"type:text;not null;serializer:encrypted"`
 	Role         string    `gorm:"type:varchar(50);not null;default:'user'"`
 	CreatedAt    time.Time `gorm:"autoCreateTime"`
 	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
@@ -67,7 +68,7 @@ type PaymentTransactionModel struct {
 	ID          string    `gorm:"primaryKey;type:varchar(64)"`
 	PersonID    string    `gorm:"index;type:varchar(64);not null"`
 	AmountPaid  float64   `gorm:"type:numeric(10,2);not null"`
-	Notes       string    `gorm:"type:text"`
+	Notes       string    `gorm:"type:text;serializer:encrypted"`
 	PaymentDate time.Time `gorm:"autoCreateTime"`
 }
 
@@ -96,11 +97,11 @@ func (ShippingPackageModel) TableName() string {
 type AuditLogModel struct {
 	ID         string    `gorm:"primaryKey;type:varchar(64)"`
 	UserID     string    `gorm:"index;type:varchar(64)"`
-	UserEmail  string    `gorm:"type:varchar(255)"`
+	UserEmail  string    `gorm:"type:text;serializer:encrypted"`
 	Action     string    `gorm:"type:varchar(50)"`
 	EntityType string    `gorm:"type:varchar(50)"`
 	EntityID   string    `gorm:"type:varchar(64)"`
-	Details    string    `gorm:"type:text"`
+	Details    string    `gorm:"type:text;serializer:encrypted"`
 	CreatedAt  time.Time `gorm:"autoCreateTime;index"`
 }
 

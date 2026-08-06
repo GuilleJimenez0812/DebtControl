@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	httpAdapter "debtcontrol/backend/internal/adapters/http"
 	postgresAdapter "debtcontrol/backend/internal/adapters/postgres"
@@ -27,6 +28,14 @@ func getEnvOrDefault(envKey string, defaultValue string) string {
 
 func main() {
 	log.Println("Starting DebtControl Backend API...")
+
+	encryptionKey := getEnvOrDefault("ENCRYPTION_KEY", "insecure-dev-encryption-key")
+	if os.Getenv("ENCRYPTION_KEY") == "" {
+		log.Println("WARNING: ENCRYPTION_KEY is not set; using an insecure development default. Set it in production.")
+	}
+	if err := postgresAdapter.SetupEncryption(encryptionKey); err != nil {
+		log.Fatalf("Failed to configure field encryption: %v", err)
+	}
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	var dsn string
@@ -62,6 +71,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to execute database migrations: %v", err)
 	}
+
+	// The plaintext unique index on users.email predates field encryption;
+	// uniqueness is now enforced through users.email_hash.
+	if databaseConnection.Migrator().HasIndex(&postgresAdapter.UserModel{}, "idx_users_email") {
+		_ = databaseConnection.Migrator().DropIndex(&postgresAdapter.UserModel{}, "idx_users_email")
+	}
 	log.Println("Database migrations completed successfully.")
 
 	userRepository := postgresAdapter.NewUserRepository(databaseConnection)
@@ -94,7 +109,11 @@ func main() {
 
 	_ = debtService.SeedInitialSpreadsheetData(ctx)
 
-	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService)
+	allowedOrigins := strings.Split(getEnvOrDefault(
+		"ALLOWED_ORIGINS",
+		"http://localhost:5173,http://localhost:3000,https://debtcontrol-1.onrender.com",
+	), ",")
+	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, allowedOrigins)
 
 	serverPort := getEnvOrDefault("PORT", "8080")
 	log.Printf("Server listening on http://localhost:%s", serverPort)

@@ -36,6 +36,10 @@ func main() {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		postgresHost, postgresUser, postgresPassword, postgresDB, postgresPort, postgresSSLMode)
 
+	if err := postgres.SetupEncryption(getEnvOrDefault("ENCRYPTION_KEY", "insecure-dev-encryption-key")); err != nil {
+		log.Fatalf("Failed to configure field encryption: %v", err)
+	}
+
 	db, err := gorm.Open(gorm_postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Database connection failure: %v", err)

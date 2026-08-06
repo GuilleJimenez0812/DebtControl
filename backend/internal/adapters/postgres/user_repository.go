@@ -20,9 +20,15 @@ func NewUserRepository(databaseConnection *gorm.DB) *UserRepository {
 }
 
 func (repository *UserRepository) Create(ctx context.Context, user *domain.User) error {
+	emailHash, err := blindIndex(user.Email)
+	if err != nil {
+		return err
+	}
+
 	model := UserModel{
 		ID:           user.ID,
 		Email:        user.Email,
+		EmailHash:    emailHash,
 		PasswordHash: user.PasswordHash,
 		FullName:     user.FullName,
 		Role:         string(user.Role),
@@ -30,7 +36,7 @@ func (repository *UserRepository) Create(ctx context.Context, user *domain.User)
 		UpdatedAt:    user.UpdatedAt,
 	}
 
-	err := repository.databaseConnection.WithContext(ctx).Create(&model).Error
+	err = repository.databaseConnection.WithContext(ctx).Create(&model).Error
 	if err != nil {
 		return err
 	}
@@ -42,8 +48,13 @@ func (repository *UserRepository) Create(ctx context.Context, user *domain.User)
 func (repository *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	_ = repository.EnsureFirstUserIsAdmin(ctx)
 
+	emailHash, err := blindIndex(email)
+	if err != nil {
+		return nil, err
+	}
+
 	var model UserModel
-	err := repository.databaseConnection.WithContext(ctx).Where("email = ?", email).First(&model).Error
+	err = repository.databaseConnection.WithContext(ctx).Where("email_hash = ?", emailHash).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
