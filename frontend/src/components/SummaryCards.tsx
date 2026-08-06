@@ -1,70 +1,141 @@
 import React from 'react';
-import { DollarSign, Calendar, TrendingUp } from 'lucide-react';
+import type { Person } from '../types';
+import type { Language } from '../i18n/translations';
+import { translations } from '../i18n/translations';
+import { DollarSign, Wallet, ArrowUpRight, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface SummaryCardsProps {
+  persons: Person[];
   totalOutstanding: number;
-  totalJuly26: number;
-  totalAugust26: number;
+  language: Language;
+  selectedPersonFilter?: string;
+  onSelectPersonFilter?: (personName: string) => void;
 }
 
 export const SummaryCards: React.FC<SummaryCardsProps> = ({
+  persons,
   totalOutstanding,
-  totalJuly26,
-  totalAugust26,
+  language,
+  selectedPersonFilter = 'All',
+  onSelectPersonFilter,
 }) => {
+  const t = translations[language];
+
+  const grandTotalOwed = persons.reduce((acc, p) => acc + p.total_owed, 0);
+  const grandTotalPaid = persons.reduce((acc, p) => acc + p.total_paid, 0);
+  const paymentProgress = grandTotalOwed > 0 ? (grandTotalPaid / grandTotalOwed) * 100 : 100;
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      {/* Outstanding Balance */}
-      <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
-        <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-amber-500/10 rounded-full blur-xl group-hover:bg-amber-500/20 transition-all"></div>
-        <div className="flex items-center justify-between">
+    <div className="mb-8 space-y-6">
+      {/* Primary Hero Summary Banner */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl relative overflow-hidden border border-slate-800 shadow-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40">
+        <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-400">
-              Outstanding Balance (Saldo Pendiente)
-            </p>
-            <h3 className="text-3xl font-extrabold text-white mt-2">
+            <div className="flex items-center space-x-2">
+              <span className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
+                <DollarSign className="w-5 h-5" />
+              </span>
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                {t.outstandingBalance}
+              </p>
+            </div>
+            <h2 className="text-4xl sm:text-5xl font-extrabold text-white mt-3 font-mono tracking-tight">
               ${totalOutstanding.toFixed(2)}
-            </h3>
+            </h2>
           </div>
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-400">
-            <DollarSign className="w-6 h-6" />
+
+          {/* Minimalist Payment Completion Progress Bar */}
+          <div className="flex items-center space-x-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 min-w-[240px]">
+            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden mb-1.5">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 transition-all duration-500"
+                  style={{ width: `${Math.min(100, Math.max(0, paymentProgress))}%` }}
+                ></div>
+              </div>
+              <p className="text-xs font-bold text-slate-200 font-mono">
+                {paymentProgress.toFixed(0)}% {language === 'es' ? 'Completado' : 'Completed'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Total July 26 */}
-      <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
-        <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl group-hover:bg-indigo-500/20 transition-all"></div>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
-              Total July 2026 (Julio-26)
-            </p>
-            <h3 className="text-3xl font-extrabold text-white mt-2">
-              ${totalJuly26.toFixed(2)}
-            </h3>
-          </div>
-          <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-400">
-            <Calendar className="w-6 h-6" />
-          </div>
+      {/* Person Breakdown Section */}
+      <div>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-2">
+            <Wallet className="w-4 h-4 text-indigo-400" />
+            <span>{language === 'es' ? 'Desglose por Persona' : 'Breakdown by Person'}</span>
+          </h3>
+          {onSelectPersonFilter && selectedPersonFilter !== 'All' && (
+            <button
+              onClick={() => onSelectPersonFilter('All')}
+              className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold"
+            >
+              {language === 'es' ? 'Ver Todas' : 'Show All'}
+            </button>
+          )}
         </div>
-      </div>
 
-      {/* Total August 26 */}
-      <div className="glass-card p-6 rounded-2xl relative overflow-hidden group">
-        <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-purple-500/10 rounded-full blur-xl group-hover:bg-purple-500/20 transition-all"></div>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-purple-400">
-              Total August 2026 (Agosto-26)
-            </p>
-            <h3 className="text-3xl font-extrabold text-white mt-2">
-              ${totalAugust26.toFixed(2)}
-            </h3>
-          </div>
-          <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-2xl text-purple-400">
-            <TrendingUp className="w-6 h-6" />
-          </div>
+        {/* Responsive Breakdown Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {persons.map((person) => {
+            const isZero = person.balance <= 0;
+            const isSelected = selectedPersonFilter === person.name;
+
+            return (
+              <div
+                key={person.id}
+                onClick={() => onSelectPersonFilter && onSelectPersonFilter(person.name)}
+                className={`glass-card p-4 rounded-2xl relative transition cursor-pointer group border ${
+                  isSelected
+                    ? 'bg-indigo-600/15 border-indigo-500/60 shadow-lg shadow-indigo-500/10'
+                    : 'border-slate-800 hover:border-slate-700 bg-slate-900/60'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-extrabold text-indigo-300 group-hover:border-indigo-500 transition">
+                      {person.name.substring(0, 2).toUpperCase()}
+                    </span>
+                    <div>
+                      <h4 className="text-sm font-bold text-white group-hover:text-indigo-300 transition line-clamp-1">
+                        {person.name}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        {language === 'es' ? 'Debe' : 'Owed'}: ${person.total_owed.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {isZero ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 transition shrink-0" />
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-800/80 pt-2.5 mt-2">
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {language === 'es' ? 'Saldo Pendiente' : 'Balance Due'}
+                  </span>
+                  <span
+                    className={`text-base font-extrabold font-mono ${
+                      isZero ? 'text-emerald-400' : 'text-amber-300'
+                    }`}
+                  >
+                    ${person.balance.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
