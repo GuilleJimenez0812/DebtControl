@@ -1,0 +1,66 @@
+services:
+  # Go API Backend Container
+  - type: web
+    name: debtcontrol-api-dev
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: JWT_SECRET
+        generateValue: true
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: debtcontrol-db-dev
+          property: host
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: debtcontrol-db-dev
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: debtcontrol-db-dev
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: debtcontrol-db-dev
+          property: database
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: debtcontrol-redis-dev
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: debtcontrol-redis-dev
+          property: port
+
+  # React Vite Frontend Static Site
+  - type: web
+    name: debtcontrol-frontend-dev
+    env: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  # Managed PostgreSQL Database
+  - name: debtcontrol-db-dev
+    databaseName: debtcontrol
+    user: postgres
+    plan: free
+    region: oregon
+
+  # Managed Redis Cache
+  - type: redis
+    name: debtcontrol-redis-dev
+    plan: free
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
