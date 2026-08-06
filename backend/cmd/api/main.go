@@ -52,6 +52,7 @@ func main() {
 
 	err = databaseConnection.AutoMigrate(
 		&postgresAdapter.UserModel{},
+		&postgresAdapter.UserPersonModel{},
 		&postgresAdapter.PersonModel{},
 		&postgresAdapter.PurchaseItemModel{},
 		&postgresAdapter.PaymentTransactionModel{},
@@ -62,7 +63,6 @@ func main() {
 	}
 	log.Println("Database migrations completed successfully.")
 
-	// Session store setup (Redis or Memory fallback)
 	var sessionRepository ports.SessionStore
 	redisHost := os.Getenv("REDIS_HOST")
 	redisEnabled := getEnvOrDefault("REDIS_ENABLED", "false")
@@ -84,12 +84,13 @@ func main() {
 
 	jwtSecret := getEnvOrDefault("JWT_SECRET", "super-secret-debtcontrol-jwt-key-2026")
 	authService := services.NewAuthService(userRepository, sessionRepository, jwtSecret)
-	debtService := services.NewDebtService(debtRepository)
+	debtService := services.NewDebtService(debtRepository, userRepository)
+	adminService := services.NewAdminService(userRepository, debtRepository)
 
 	ctx := context.Background()
 	_ = debtService.SeedInitialSpreadsheetData(ctx)
 
-	routerEngine := httpAdapter.SetupRouter(authService, debtService)
+	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService)
 
 	serverPort := getEnvOrDefault("PORT", "8080")
 	log.Printf("Server listening on http://localhost:%s", serverPort)

@@ -13,6 +13,7 @@ import { AuthModal } from './components/AuthModal';
 import { AuthWall } from './components/AuthWall';
 import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewPaymentModal } from './components/NewPaymentModal';
+import { AdminUserModal } from './components/AdminUserModal';
 import { Layers, ShoppingBag } from 'lucide-react';
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ const DashboardContent: React.FC = () => {
   const [selectedPeriodFilter, setSelectedPeriodFilter] = useState<string>('All');
 
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState<boolean>(false);
   const [selectedPersonForPayment, setSelectedPersonForPayment] = useState<Person | null>(null);
   const [selectedPurchaseForModal, setSelectedPurchaseForModal] = useState<PurchaseItem | null>(null);
@@ -56,6 +58,12 @@ const DashboardContent: React.FC = () => {
     queryKey: ['dashboardSummary'],
     queryFn: apiService.getDashboardSummary,
     enabled: !!user,
+  });
+
+  const { data: adminUsers, refetch: refetchAdminUsers } = useQuery({
+    queryKey: ['adminUsers'],
+    queryFn: apiService.getAdminUsers,
+    enabled: !!user && user.role === 'admin',
   });
 
   const seedMutation = useMutation({
@@ -95,6 +103,22 @@ const DashboardContent: React.FC = () => {
     },
   });
 
+  const createAdminUserMutation = useMutation({
+    mutationFn: apiService.createAdminUser,
+    onSuccess: () => {
+      refetchAdminUsers();
+    },
+  });
+
+  const assignUserPersonsMutation = useMutation({
+    mutationFn: ({ userId, personIds }: { userId: string; personIds: string[] }) =>
+      apiService.assignUserPersons(userId, personIds),
+    onSuccess: () => {
+      refetchAdminUsers();
+      queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+
   const handleLogin = async (email: string, pass: string) => {
     const result = await apiService.login(email, pass);
     setUser(result.user);
@@ -125,6 +149,7 @@ const DashboardContent: React.FC = () => {
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
         onOpenAuthModal={() => setIsAuthOpen(true)}
+        onOpenAdminModal={() => setIsAdminOpen(true)}
         onLogout={handleLogout}
         onSeedData={() => seedMutation.mutate()}
         isSeeding={seedMutation.isPending}
@@ -206,6 +231,19 @@ const DashboardContent: React.FC = () => {
         onClose={() => setIsAuthOpen(false)}
         onLogin={handleLogin}
         onRegister={handleRegister}
+      />
+
+      <AdminUserModal
+        isOpen={isAdminOpen}
+        usersWithPersons={adminUsers || []}
+        allPersons={summary?.persons || []}
+        onClose={() => setIsAdminOpen(false)}
+        onCreateUser={async (payload) => {
+          await createAdminUserMutation.mutateAsync(payload);
+        }}
+        onAssignPersons={async (userId, personIds) => {
+          await assignUserPersonsMutation.mutateAsync({ userId, personIds });
+        }}
       />
 
       <NewPurchaseModal

@@ -20,7 +20,7 @@ func NewUserRepository(databaseConnection *gorm.DB) *UserRepository {
 }
 
 func (repository *UserRepository) Create(ctx context.Context, user *domain.User) error {
-	userModel := &UserModel{
+	model := UserModel{
 		ID:           user.ID,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
@@ -29,45 +29,103 @@ func (repository *UserRepository) Create(ctx context.Context, user *domain.User)
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 	}
-	return repository.databaseConnection.WithContext(ctx).Create(userModel).Error
+
+	return repository.databaseConnection.WithContext(ctx).Create(&model).Error
 }
 
 func (repository *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
-	var userModel UserModel
-	err := repository.databaseConnection.WithContext(ctx).Where("email = ?", email).First(&userModel).Error
+	var model UserModel
+	err := repository.databaseConnection.WithContext(ctx).Where("email = ?", email).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
 	}
+
 	return &domain.User{
-		ID:           userModel.ID,
-		Email:        userModel.Email,
-		PasswordHash: userModel.PasswordHash,
-		FullName:     userModel.FullName,
-		Role:         domain.UserRole(userModel.Role),
-		CreatedAt:    userModel.CreatedAt,
-		UpdatedAt:    userModel.UpdatedAt,
+		ID:           model.ID,
+		Email:        model.Email,
+		PasswordHash: model.PasswordHash,
+		FullName:     model.FullName,
+		Role:         domain.Role(model.Role),
+		CreatedAt:    model.CreatedAt,
+		UpdatedAt:    model.UpdatedAt,
 	}, nil
 }
 
 func (repository *UserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
-	var userModel UserModel
-	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).First(&userModel).Error
+	var model UserModel
+	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
 	}
+
 	return &domain.User{
-		ID:           userModel.ID,
-		Email:        userModel.Email,
-		PasswordHash: userModel.PasswordHash,
-		FullName:     userModel.FullName,
-		Role:         domain.UserRole(userModel.Role),
-		CreatedAt:    userModel.CreatedAt,
-		UpdatedAt:    userModel.UpdatedAt,
+		ID:           model.ID,
+		Email:        model.Email,
+		PasswordHash: model.PasswordHash,
+		FullName:     model.FullName,
+		Role:         domain.Role(model.Role),
+		CreatedAt:    model.CreatedAt,
+		UpdatedAt:    model.UpdatedAt,
 	}, nil
+}
+
+func (repository *UserRepository) FindAll(ctx context.Context) ([]*domain.User, error) {
+	var models []UserModel
+	err := repository.databaseConnection.WithContext(ctx).Order("created_at ASC").Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]*domain.User, len(models))
+	for index, model := range models {
+		users[index] = &domain.User{
+			ID:           model.ID,
+			Email:        model.Email,
+			PasswordHash: model.PasswordHash,
+			FullName:     model.FullName,
+			Role:         domain.Role(model.Role),
+			CreatedAt:    model.CreatedAt,
+			UpdatedAt:    model.UpdatedAt,
+		}
+	}
+	return users, nil
+}
+
+func (repository *UserRepository) AssignPersonsToUser(ctx context.Context, userID string, personIDs []string) error {
+	return repository.databaseConnection.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", userID).Delete(&UserPersonModel{}).Error; err != nil {
+			return err
+		}
+
+		for _, personID := range personIDs {
+			userPerson := UserPersonModel{
+				UserID:   userID,
+				PersonID: personID,
+			}
+			if err := tx.Create(&userPerson).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (repository *UserRepository) GetAssignedPersonIDs(ctx context.Context, userID string) ([]string, error) {
+	var models []UserPersonModel
+	err := repository.databaseConnection.WithContext(ctx).Where("user_id = ?", userID).Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	personIDs := make([]string, len(models))
+	for index, model := range models {
+		personIDs[index] = model.PersonID
+	}
+	return personIDs, nil
 }

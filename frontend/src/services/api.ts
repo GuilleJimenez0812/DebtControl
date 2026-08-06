@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DashboardSummary, User, PurchaseItem, ShippingPackage } from '../types';
+import type { DashboardSummary, User, PurchaseItem, ShippingPackage, Person } from '../types';
 
 const apiClient = axios.create({
   baseURL: '/api/v1',
@@ -8,6 +8,12 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+export interface UserWithPersons {
+  user: User;
+  assigned_persons: Person[];
+  assigned_person_ids: string[];
+}
 
 export const apiService = {
   // Auth
@@ -81,6 +87,22 @@ export const apiService = {
 
   seedData: async () => {
     const response = await apiClient.post('/debts/seed');
+    return response.data;
+  },
+
+  // Admin User & Person Access Management
+  getAdminUsers: async (): Promise<UserWithPersons[]> => {
+    const response = await apiClient.get<{ users: UserWithPersons[] }>('/admin/users');
+    return response.data.users;
+  },
+
+  createAdminUser: async (payload: { email: string; password: string; full_name: string; role: string }) => {
+    const response = await apiClient.post('/admin/users', payload);
+    return response.data;
+  },
+
+  assignUserPersons: async (userId: string, personIds: string[]) => {
+    const response = await apiClient.put(`/admin/users/${userId}/persons`, { person_ids: personIds });
     return response.data;
   },
 };

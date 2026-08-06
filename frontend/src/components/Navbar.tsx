@@ -2,7 +2,7 @@ import React from 'react';
 import type { User } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { CreditCard, LogIn, LogOut, ShieldCheck, Database, Globe, Sun, Moon } from 'lucide-react';
+import { CreditCard, LogIn, LogOut, ShieldCheck, Database, Globe, Sun, Moon, Users } from 'lucide-react';
 
 interface NavbarProps {
   user: User | null;
@@ -11,6 +11,7 @@ interface NavbarProps {
   isDarkMode: boolean;
   onToggleTheme: () => void;
   onOpenAuthModal: () => void;
+  onOpenAdminModal: () => void;
   onLogout: () => void;
   onSeedData: () => void;
   isSeeding: boolean;
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isDarkMode,
   onToggleTheme,
   onOpenAuthModal,
+  onOpenAdminModal,
   onLogout,
   onSeedData,
   isSeeding,
@@ -84,6 +86,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Database className="w-3.5 h-3.5 text-indigo-400" />
               <span>{isSeeding ? t.seeding : t.seedData}</span>
+            </button>
+          )}
+
+          {/* Admin User Management Button */}
+          {user && user.role === 'admin' && (
+            <button
+              onClick={onOpenAdminModal}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold transition"
+            >
+              <Users className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline">User Permissions</span>
             </button>
           )}
 

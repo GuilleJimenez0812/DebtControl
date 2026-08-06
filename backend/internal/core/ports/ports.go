@@ -11,6 +11,10 @@ type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
 	FindByEmail(ctx context.Context, email string) (*domain.User, error)
 	FindByID(ctx context.Context, id string) (*domain.User, error)
+	FindAll(ctx context.Context) ([]*domain.User, error)
+
+	AssignPersonsToUser(ctx context.Context, userID string, personIDs []string) error
+	GetAssignedPersonIDs(ctx context.Context, userID string) ([]string, error)
 }
 
 type DebtRepository interface {
@@ -46,6 +50,18 @@ type AuthUseCase interface {
 	ValidateAccessToken(ctx context.Context, tokenString string) (*domain.User, string, error)
 }
 
+type UserWithPersons struct {
+	User            *domain.User     `json:"user"`
+	AssignedPersons []*domain.Person `json:"assigned_persons"`
+	AssignedIDs     []string         `json:"assigned_person_ids"`
+}
+
+type AdminUseCase interface {
+	CreateUser(ctx context.Context, email string, password string, fullName string, role string) (*domain.User, error)
+	ListUsersWithPersons(ctx context.Context) ([]*UserWithPersons, error)
+	AssignPersonsToUser(ctx context.Context, userID string, personIDs []string) error
+}
+
 type DashboardSummary struct {
 	TotalOutstanding float64                  `json:"total_outstanding"`
 	TotalJuly26      float64                  `json:"total_july_26"`
@@ -56,8 +72,8 @@ type DashboardSummary struct {
 }
 
 type DebtUseCase interface {
-	GetDashboardSummary(ctx context.Context) (*DashboardSummary, error)
-	ListPersons(ctx context.Context) ([]*domain.Person, error)
+	GetDashboardSummaryForUser(ctx context.Context, user *domain.User) (*DashboardSummary, error)
+	ListPersonsForUser(ctx context.Context, user *domain.User) ([]*domain.Person, error)
 	CreatePurchaseItem(ctx context.Context, personName string, orderNumber string, description string, amount float64, tax float64, shipping float64, detailPeriod string) (*domain.PurchaseItem, error)
 	UpdatePurchaseItem(ctx context.Context, id string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string) (*domain.PurchaseItem, error)
 	UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error)

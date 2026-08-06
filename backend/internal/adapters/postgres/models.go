@@ -18,6 +18,16 @@ func (UserModel) TableName() string {
 	return "users"
 }
 
+type UserPersonModel struct {
+	UserID    string    `gorm:"primaryKey;type:varchar(64);not null"`
+	PersonID  string    `gorm:"primaryKey;type:varchar(64);not null"`
+	CreatedAt time.Time `gorm:"autoCreateTime"`
+}
+
+func (UserPersonModel) TableName() string {
+	return "user_persons"
+}
+
 type PersonModel struct {
 	ID        string    `gorm:"primaryKey;type:varchar(64)"`
 	Name      string    `gorm:"uniqueIndex;type:varchar(255);not null"`
