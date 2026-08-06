@@ -26,7 +26,13 @@ func (handler *AuthHandler) Register(ginContext *gin.Context) {
 		return
 	}
 
-	user, err := handler.authUseCase.Register(ginContext.Request.Context(), requestPayload.Email, requestPayload.Password, requestPayload.FullName)
+	user, err := handler.authUseCase.Register(
+		ginContext.Request.Context(),
+		requestPayload.Email,
+		requestPayload.Password,
+		requestPayload.FullName,
+	)
+
 	if err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
