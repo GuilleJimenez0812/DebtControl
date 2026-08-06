@@ -189,6 +189,33 @@ func (service *DebtService) UpdatePurchaseItem(ctx context.Context, id string, i
 	return item, nil
 }
 
+func (service *DebtService) syncPurchaseShippingCost(ctx context.Context, orderNumber string) error {
+	purchase, err := service.debtRepo.FindPurchaseItemByOrderNumber(ctx, orderNumber)
+	if err != nil || purchase == nil {
+		return nil // No purchase linked to this order number, nothing to sync
+	}
+
+	packages, err := service.debtRepo.FindPackagesByOrderNumber(ctx, orderNumber)
+	if err != nil {
+		return err
+	}
+
+	var totalShipping float64
+	for _, pkg := range packages {
+		totalShipping += pkg.ShippingCost
+	}
+
+	purchase.ShippingCost = totalShipping
+	purchase.RecalculateTotalCost()
+
+	if err := service.debtRepo.SavePurchase(ctx, purchase); err != nil {
+		return err
+	}
+
+	_ = service.debtRepo.RecalculateAllBalances(ctx)
+	return nil
+}
+
 func (service *DebtService) UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error) {
 	pkg, err := service.debtRepo.FindPackageByID(ctx, id)
 	if err != nil || pkg == nil {
@@ -205,6 +232,41 @@ func (service *DebtService) UpdateShippingPackage(ctx context.Context, id string
 	if err != nil {
 		return nil, err
 	}
+
+	_ = service.syncPurchaseShippingCost(ctx, pkg.OrderNumber)
+
+	return pkg, nil
+}
+
+func (service *DebtService) CreateShippingPackage(ctx context.Context, purchaseID string, trackingNumber string, shippingCost float64) (*domain.ShippingPackage, error) {
+	purchase, err := service.debtRepo.FindPurchaseByID(ctx, purchaseID)
+	if err != nil {
+		return nil, err
+	}
+	if purchase == nil {
+		return nil, domain.ErrPurchaseItemNotFound
+	}
+
+	pkg := &domain.ShippingPackage{
+		ID:                 uuid.New().String(),
+		OrderNumber:        purchase.OrderNumber,
+		TrackingNumber:     trackingNumber,
+		ShippingCost:       shippingCost,
+		ItemDescription:    "",
+		WarehouseReceived:  false,
+		PersonallyReceived: false,
+		DispatchDate:       "",
+		BatchMonth:         "",
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+
+	err = service.debtRepo.SavePackage(ctx, pkg)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = service.syncPurchaseShippingCost(ctx, purchase.OrderNumber)
 
 	return pkg, nil
 }
@@ -424,4 +486,21 @@ func (service *DebtService) ConfirmAttachInvoice(ctx context.Context, purchaseID
 	}
 
 	return item, nil
+}
+
+func (service *DebtService) SearchOrders(ctx context.Context, query string, user *domain.User, limit int) ([]*ports.SearchResult, error) {
+	var personIDs []string
+	if user.Role != domain.RoleAdmin {
+		var err error
+		personIDs, err = service.userRepo.GetAssignedPersonIDs(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		// If a standard user has no assigned persons, they shouldn't see any results
+		if len(personIDs) == 0 {
+			return []*ports.SearchResult{}, nil
+		}
+	}
+
+	return service.debtRepo.SearchOrders(ctx, query, personIDs, limit)
 }

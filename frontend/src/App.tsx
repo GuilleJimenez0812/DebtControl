@@ -16,6 +16,7 @@ import { NewPaymentModal } from './components/NewPaymentModal';
 import { AdminUserModal } from './components/AdminUserModal';
 import { UploadInvoiceModal } from './components/UploadInvoiceModal';
 import { InvoicePreviewModal } from './components/InvoicePreviewModal';
+import { SearchBar } from './components/SearchBar';
 import { Layers, ShoppingBag } from 'lucide-react';
 
 const queryClient = new QueryClient({
@@ -100,6 +101,14 @@ const DashboardContent: React.FC = () => {
     },
   });
 
+  const createPackageMutation = useMutation({
+    mutationFn: ({ purchaseId, trackingNumber, shippingCost }: { purchaseId: string; trackingNumber: string; shippingCost: number }) =>
+      apiService.createPackage(purchaseId, trackingNumber, shippingCost),
+    onSuccess: () => {
+      queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+
   const updatePackageMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string } }) =>
       apiService.updatePackage(id, payload),
@@ -138,6 +147,15 @@ const DashboardContent: React.FC = () => {
       queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
     },
   });
+
+  const handleSearchResultSelect = (purchaseId: string) => {
+    if (summary && summary.recent_purchases) {
+      const purchase = summary.recent_purchases.find(p => p.id === purchaseId);
+      if (purchase) {
+        setSelectedPurchaseForModal(purchase);
+      }
+    }
+  };
 
   const handleLogin = async (email: string, pass: string) => {
     const result = await apiService.login(email, pass);
@@ -189,8 +207,10 @@ const DashboardContent: React.FC = () => {
               onSelectPersonFilter={handleSelectPersonFromSummary}
             />
 
+            <SearchBar language={language} onSelectResult={handleSearchResultSelect} />
+
             {/* View Tabs */}
-            <div className="flex space-x-2 border-b border-slate-800/80 mb-6 pb-2">
+            <div className="flex space-x-2 border-b border-slate-800/80 mb-6 pb-2 mt-2">
               <button
                 onClick={() => setActiveTab('debts')}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition ${
@@ -330,6 +350,9 @@ const DashboardContent: React.FC = () => {
         }}
         onUpdatePackage={async (id, payload) => {
           await updatePackageMutation.mutateAsync({ id, payload });
+        }}
+        onCreatePackage={async (purchaseId, trackingNumber, shippingCost) => {
+          await createPackageMutation.mutateAsync({ purchaseId, trackingNumber, shippingCost });
         }}
       />
     </div>

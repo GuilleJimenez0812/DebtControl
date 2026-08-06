@@ -103,6 +103,14 @@ export const apiService = {
     return response.data;
   },
 
+  createPackage: async (purchaseId: string, trackingNumber: string, shippingCost: number): Promise<{ package: ShippingPackage }> => {
+    const response = await apiClient.post<{ package: ShippingPackage }>(`/debts/purchases/${purchaseId}/packages`, { 
+      tracking_number: trackingNumber,
+      shipping_cost: shippingCost 
+    });
+    return response.data;
+  },
+
   updatePackage: async (
     id: string,
     payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }

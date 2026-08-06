@@ -28,6 +28,11 @@ type UpdatePurchaseRequest struct {
 	InvoiceURL   string  `json:"invoice_url"`
 }
 
+type CreatePackageRequest struct {
+	TrackingNumber string  `json:"tracking_number" binding:"required"`
+	ShippingCost   float64 `json:"shipping_cost" binding:"gte=0"`
+}
+
 type UpdatePackageRequest struct {
 	ShippingCost       float64 `json:"shipping_cost" binding:"gte=0"`
 	WarehouseReceived  bool    `json:"warehouse_received"`

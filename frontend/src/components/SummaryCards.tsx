@@ -108,9 +108,6 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
                       <h4 className="text-sm font-bold text-white group-hover:text-indigo-300 transition line-clamp-1">
                         {person.name}
                       </h4>
-                      <p className="text-[11px] text-slate-400 font-mono">
-                        {language === 'es' ? 'Debe' : 'Owed'}: ${person.total_owed.toFixed(2)}
-                      </p>
                     </div>
                   </div>
 
