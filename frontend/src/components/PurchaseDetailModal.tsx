@@ -9,6 +9,7 @@ interface PurchaseDetailModalProps {
   packages: ShippingPackage[];
   isOpen: boolean;
   language: Language;
+  userRole?: string;
   onClose: () => void;
   onUpdatePurchase: (id: string, payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string }) => Promise<void>;
   onUpdatePackage: (id: string, payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
@@ -19,11 +20,13 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   packages,
   isOpen,
   language,
+  userRole,
   onClose,
   onUpdatePurchase,
   onUpdatePackage,
 }) => {
   const t = translations[language];
+  const isAdmin = userRole === 'admin';
 
   const [isEditingPurchase, setIsEditingPurchase] = useState<boolean>(false);
   const [itemAmount, setItemAmount] = useState<number>(purchase?.item_amount || 0);
@@ -94,28 +97,30 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
         <div className="glass-card p-4 rounded-2xl mb-6">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Cost Breakdown & Invoice</span>
-            {!isEditingPurchase ? (
-              <button
-                onClick={() => {
-                  setItemAmount(purchase.item_amount);
-                  setTaxAmount(purchase.tax_amount);
-                  setShippingCost(purchase.shipping_cost);
-                  setInvoiceUrl(purchase.invoice_url || '');
-                  setIsEditingPurchase(true);
-                }}
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 font-semibold"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-                <span>Edit Amounts</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleSavePurchase}
-                className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 font-semibold bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save Purchase</span>
-              </button>
+            {isAdmin && (
+              !isEditingPurchase ? (
+                <button
+                  onClick={() => {
+                    setItemAmount(purchase.item_amount);
+                    setTaxAmount(purchase.tax_amount);
+                    setShippingCost(purchase.shipping_cost);
+                    setInvoiceUrl(purchase.invoice_url || '');
+                    setIsEditingPurchase(true);
+                  }}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 font-semibold"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Edit Amounts</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleSavePurchase}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 font-semibold bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Purchase</span>
+                </button>
+              )
             )}
           </div>
 
@@ -210,22 +215,24 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                 <div key={pkg.id} className="glass-card p-4 rounded-2xl text-xs space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-indigo-300 font-bold">{pkg.tracking_number || 'No Tracking ID'}</span>
-                    {!isPkgEditing ? (
-                      <button
-                        onClick={() => handleStartEditPackage(pkg)}
-                        className="text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 font-semibold"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        <span>Update Tracking</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleSavePackage(pkg.id)}
-                        className="text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 font-semibold bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>Save Package</span>
-                      </button>
+                    {isAdmin && (
+                      !isPkgEditing ? (
+                        <button
+                          onClick={() => handleStartEditPackage(pkg)}
+                          className="text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 font-semibold"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Update Tracking</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleSavePackage(pkg.id)}
+                          className="text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 font-semibold bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Package</span>
+                        </button>
+                      )
                     )}
                   </div>
 

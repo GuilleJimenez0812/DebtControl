@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase) *gin.Engine {
+func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase) *gin.Engine {
 	routerEngine := gin.Default()
 
 	routerEngine.Use(SecurityHeadersMiddleware())
@@ -25,6 +25,7 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase) *
 
 	authHandler := NewAuthHandler(authUseCase)
 	debtHandler := NewDebtHandler(debtUseCase)
+	adminHandler := NewAdminHandler(adminUseCase)
 
 	apiGroup := routerEngine.Group("/api/v1")
 	{
@@ -39,13 +40,24 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase) *
 		debtGroup := apiGroup.Group("/debts")
 		debtGroup.Use(AuthMiddleware(authUseCase))
 		{
+			// Read operations (available to all authenticated users, scoped by person permissions)
 			debtGroup.GET("/summary", debtHandler.GetDashboardSummary)
 			debtGroup.GET("/persons", debtHandler.ListPersons)
-			debtGroup.POST("/purchases", debtHandler.CreatePurchase)
-			debtGroup.PUT("/purchases/:id", debtHandler.UpdatePurchase)
-			debtGroup.PUT("/packages/:id", debtHandler.UpdatePackage)
-			debtGroup.POST("/payments", debtHandler.RecordPayment)
-			debtGroup.POST("/seed", debtHandler.SeedData)
+
+			// Admin-only write/mutation operations
+			debtGroup.POST("/purchases", RequireAdminRole(), debtHandler.CreatePurchase)
+			debtGroup.PUT("/purchases/:id", RequireAdminRole(), debtHandler.UpdatePurchase)
+			debtGroup.PUT("/packages/:id", RequireAdminRole(), debtHandler.UpdatePackage)
+			debtGroup.POST("/payments", RequireAdminRole(), debtHandler.RecordPayment)
+			debtGroup.POST("/seed", RequireAdminRole(), debtHandler.SeedData)
+		}
+
+		adminGroup := apiGroup.Group("/admin")
+		adminGroup.Use(AuthMiddleware(authUseCase), RequireAdminRole())
+		{
+			adminGroup.GET("/users", adminHandler.ListUsers)
+			adminGroup.POST("/users", adminHandler.CreateUser)
+			adminGroup.PUT("/users/:id/persons", adminHandler.AssignPersons)
 		}
 	}
 

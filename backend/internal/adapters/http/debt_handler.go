@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 
+	"debtcontrol/backend/internal/core/domain"
 	"debtcontrol/backend/internal/core/ports"
 
 	"github.com/gin-gonic/gin"
@@ -19,7 +20,14 @@ func NewDebtHandler(debtUseCase ports.DebtUseCase) *DebtHandler {
 }
 
 func (handler *DebtHandler) GetDashboardSummary(ginContext *gin.Context) {
-	summary, err := handler.debtUseCase.GetDashboardSummary(ginContext.Request.Context())
+	currentUser, exists := ginContext.Get("user")
+	if !exists {
+		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": "user context missing"})
+		return
+	}
+	userEntity := currentUser.(*domain.User)
+
+	summary, err := handler.debtUseCase.GetDashboardSummaryForUser(ginContext.Request.Context(), userEntity)
 	if err != nil {
 		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -28,7 +36,14 @@ func (handler *DebtHandler) GetDashboardSummary(ginContext *gin.Context) {
 }
 
 func (handler *DebtHandler) ListPersons(ginContext *gin.Context) {
-	persons, err := handler.debtUseCase.ListPersons(ginContext.Request.Context())
+	currentUser, exists := ginContext.Get("user")
+	if !exists {
+		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": "user context missing"})
+		return
+	}
+	userEntity := currentUser.(*domain.User)
+
+	persons, err := handler.debtUseCase.ListPersonsForUser(ginContext.Request.Context(), userEntity)
 	if err != nil {
 		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

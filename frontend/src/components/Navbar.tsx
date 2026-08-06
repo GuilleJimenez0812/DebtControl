@@ -2,7 +2,7 @@ import React from 'react';
 import type { User } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { CreditCard, LogIn, LogOut, ShieldCheck, Database, Globe, Sun, Moon } from 'lucide-react';
+import { CreditCard, LogIn, LogOut, ShieldCheck, Database, Globe, Sun, Moon, Users, Crown } from 'lucide-react';
 
 interface NavbarProps {
   user: User | null;
@@ -11,6 +11,7 @@ interface NavbarProps {
   isDarkMode: boolean;
   onToggleTheme: () => void;
   onOpenAuthModal: () => void;
+  onOpenAdminModal: () => void;
   onLogout: () => void;
   onSeedData: () => void;
   isSeeding: boolean;
@@ -23,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isDarkMode,
   onToggleTheme,
   onOpenAuthModal,
+  onOpenAdminModal,
   onLogout,
   onSeedData,
   isSeeding,
@@ -49,20 +51,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs">
             <Globe className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
             <button
-              onClick={() => onLanguageChange('en')}
-              className={`px-2 py-1 rounded-lg font-bold transition ${
-                language === 'en' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              EN
-            </button>
-            <button
               onClick={() => onLanguageChange('es')}
               className={`px-2 py-1 rounded-lg font-bold transition ${
                 language === 'es' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               ES
+            </button>
+            <button
+              onClick={() => onLanguageChange('en')}
+              className={`px-2 py-1 rounded-lg font-bold transition ${
+                language === 'en' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              EN
             </button>
           </div>
 
@@ -87,10 +89,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
+          {/* Admin User Management Button */}
+          {user && user.role === 'admin' && (
+            <button
+              onClick={onOpenAdminModal}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold transition"
+            >
+              <Users className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline">User Permissions</span>
+            </button>
+          )}
+
           {user ? (
             <div className="flex items-center space-x-2">
-              <div className="flex items-center space-x-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 text-xs text-slate-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <div className="flex items-center space-x-2 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 text-xs text-slate-300" title={user.role === 'admin' ? 'Administrator Role' : 'User Role'}>
+                {user.role === 'admin' ? (
+                  <Crown className="w-4 h-4 text-amber-400 animate-pulse" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                )}
                 <span className="font-semibold text-slate-200">{user.full_name}</span>
               </div>
               <button

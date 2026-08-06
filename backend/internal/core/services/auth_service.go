@@ -42,8 +42,14 @@ func (service *AuthService) Register(ctx context.Context, email string, password
 		return nil, err
 	}
 
+	assignedRole := domain.RoleUser
+	allUsers, _ := service.userRepo.FindAll(ctx)
+	if len(allUsers) == 0 {
+		assignedRole = domain.RoleAdmin // First user registered in DB is automatically Admin
+	}
+
 	userID := uuid.New().String()
-	newUser, err := domain.NewUser(userID, email, hashedPassword, fullName, domain.RoleUser)
+	newUser, err := domain.NewUser(userID, email, hashedPassword, fullName, assignedRole)
 	if err != nil {
 		return nil, err
 	}

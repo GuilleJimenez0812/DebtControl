@@ -13,6 +13,7 @@ import { AuthModal } from './components/AuthModal';
 import { AuthWall } from './components/AuthWall';
 import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewPaymentModal } from './components/NewPaymentModal';
+import { AdminUserModal } from './components/AdminUserModal';
 import { Layers, ShoppingBag } from 'lucide-react';
 
 const queryClient = new QueryClient({
@@ -28,14 +29,23 @@ const DashboardContent: React.FC = () => {
   const queryClientInstance = useQueryClient();
 
   const [user, setUser] = useState<User | null>(null);
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguage] = useState<Language>(() => {
+    const savedLang = localStorage.getItem('debtcontrol_lang');
+    return (savedLang === 'en' || savedLang === 'es') ? savedLang : 'es';
+  });
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+
+  const handleLanguageChange = (newLang: Language) => {
+    setLanguage(newLang);
+    localStorage.setItem('debtcontrol_lang', newLang);
+  };
 
   const [activeTab, setActiveTab] = useState<'debts' | 'purchases'>('debts');
   const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>('All');
   const [selectedPeriodFilter, setSelectedPeriodFilter] = useState<string>('All');
 
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState<boolean>(false);
   const [selectedPersonForPayment, setSelectedPersonForPayment] = useState<Person | null>(null);
   const [selectedPurchaseForModal, setSelectedPurchaseForModal] = useState<PurchaseItem | null>(null);
@@ -56,6 +66,12 @@ const DashboardContent: React.FC = () => {
     queryKey: ['dashboardSummary'],
     queryFn: apiService.getDashboardSummary,
     enabled: !!user,
+  });
+
+  const { data: adminUsers, refetch: refetchAdminUsers } = useQuery({
+    queryKey: ['adminUsers'],
+    queryFn: apiService.getAdminUsers,
+    enabled: !!user && user.role === 'admin',
   });
 
   const seedMutation = useMutation({
@@ -95,6 +111,22 @@ const DashboardContent: React.FC = () => {
     },
   });
 
+  const createAdminUserMutation = useMutation({
+    mutationFn: apiService.createAdminUser,
+    onSuccess: () => {
+      refetchAdminUsers();
+    },
+  });
+
+  const assignUserPersonsMutation = useMutation({
+    mutationFn: ({ userId, personIds }: { userId: string; personIds: string[] }) =>
+      apiService.assignUserPersons(userId, personIds),
+    onSuccess: () => {
+      refetchAdminUsers();
+      queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+
   const handleLogin = async (email: string, pass: string) => {
     const result = await apiService.login(email, pass);
     setUser(result.user);
@@ -121,10 +153,11 @@ const DashboardContent: React.FC = () => {
       <Navbar
         user={user}
         language={language}
-        onLanguageChange={setLanguage}
+        onLanguageChange={handleLanguageChange}
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
         onOpenAuthModal={() => setIsAuthOpen(true)}
+        onOpenAdminModal={() => setIsAdminOpen(true)}
         onLogout={handleLogout}
         onSeedData={() => seedMutation.mutate()}
         isSeeding={seedMutation.isPending}
@@ -178,6 +211,7 @@ const DashboardContent: React.FC = () => {
                   <DebtTable
                     persons={summary?.persons || []}
                     language={language}
+                    userRole={user?.role}
                     onOpenPaymentModal={(person) => setSelectedPersonForPayment(person)}
                     onOpenPurchaseModal={() => setIsPurchaseOpen(true)}
                     onSelectPersonFilter={handleSelectPersonFromSummary}
@@ -208,6 +242,19 @@ const DashboardContent: React.FC = () => {
         onRegister={handleRegister}
       />
 
+      <AdminUserModal
+        isOpen={isAdminOpen}
+        usersWithPersons={adminUsers || []}
+        allPersons={summary?.persons || []}
+        onClose={() => setIsAdminOpen(false)}
+        onCreateUser={async (payload) => {
+          await createAdminUserMutation.mutateAsync(payload);
+        }}
+        onAssignPersons={async (userId, personIds) => {
+          await assignUserPersonsMutation.mutateAsync({ userId, personIds });
+        }}
+      />
+
       <NewPurchaseModal
         isOpen={isPurchaseOpen}
         onClose={() => setIsPurchaseOpen(false)}
@@ -230,6 +277,7 @@ const DashboardContent: React.FC = () => {
         packages={summary?.shipping_packages || []}
         isOpen={!!selectedPurchaseForModal}
         language={language}
+        userRole={user?.role}
         onClose={() => setSelectedPurchaseForModal(null)}
         onUpdatePurchase={async (id, payload) => {
           await updatePurchaseMutation.mutateAsync({ id, payload });

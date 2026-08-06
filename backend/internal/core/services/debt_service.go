@@ -13,43 +13,101 @@ import (
 
 type DebtService struct {
 	debtRepo ports.DebtRepository
+	userRepo ports.UserRepository
 }
 
-func NewDebtService(debtRepo ports.DebtRepository) *DebtService {
+func NewDebtService(debtRepo ports.DebtRepository, userRepo ports.UserRepository) *DebtService {
 	return &DebtService{
 		debtRepo: debtRepo,
+		userRepo: userRepo,
 	}
 }
 
-func (service *DebtService) ListPersons(ctx context.Context) ([]*domain.Person, error) {
-	return service.debtRepo.FindAllPersons(ctx)
+func (service *DebtService) ListPersonsForUser(ctx context.Context, user *domain.User) ([]*domain.Person, error) {
+	allPersons, err := service.debtRepo.FindAllPersons(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.Role == domain.RoleAdmin {
+		return allPersons, nil
+	}
+
+	assignedIDs, err := service.userRepo.GetAssignedPersonIDs(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	assignedMap := make(map[string]bool)
+	for _, id := range assignedIDs {
+		assignedMap[id] = true
+	}
+
+	filtered := make([]*domain.Person, 0)
+	for _, person := range allPersons {
+		if assignedMap[person.ID] {
+			filtered = append(filtered, person)
+		}
+	}
+	return filtered, nil
 }
 
-func (service *DebtService) GetDashboardSummary(ctx context.Context) (*ports.DashboardSummary, error) {
-	persons, err := service.debtRepo.FindAllPersons(ctx)
+func (service *DebtService) GetDashboardSummaryForUser(ctx context.Context, user *domain.User) (*ports.DashboardSummary, error) {
+	allPersons, err := service.debtRepo.FindAllPersons(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	purchases, err := service.debtRepo.FindAllPurchases(ctx)
+	allPurchases, err := service.debtRepo.FindAllPurchases(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	packages, err := service.debtRepo.FindAllPackages(ctx)
+	allPackages, err := service.debtRepo.FindAllPackages(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	var allowedPersons []*domain.Person
+	var allowedPurchases []*domain.PurchaseItem
+
+	if user.Role == domain.RoleAdmin {
+		allowedPersons = allPersons
+		allowedPurchases = allPurchases
+	} else {
+		assignedIDs, err := service.userRepo.GetAssignedPersonIDs(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		assignedMap := make(map[string]bool)
+		for _, id := range assignedIDs {
+			assignedMap[id] = true
+		}
+
+		allowedPersons = make([]*domain.Person, 0)
+		for _, person := range allPersons {
+			if assignedMap[person.ID] {
+				allowedPersons = append(allowedPersons, person)
+			}
+		}
+
+		allowedPurchases = make([]*domain.PurchaseItem, 0)
+		for _, purchase := range allPurchases {
+			if assignedMap[purchase.PersonID] {
+				allowedPurchases = append(allowedPurchases, purchase)
+			}
+		}
 	}
 
 	var totalOutstanding float64
-	for _, person := range persons {
+	for _, person := range allowedPersons {
 		totalOutstanding += person.Balance
 	}
 
 	var totalJuly26 float64
 	var totalAugust26 float64
 
-	for _, purchase := range purchases {
+	for _, purchase := range allowedPurchases {
 		if purchase.DetailPeriod == "Julio-26" {
 			totalJuly26 += purchase.TotalCost
 		} else if purchase.DetailPeriod == "Agosto-26" {
@@ -61,9 +119,9 @@ func (service *DebtService) GetDashboardSummary(ctx context.Context) (*ports.Das
 		TotalOutstanding: math.Round(totalOutstanding*100) / 100,
 		TotalJuly26:      math.Round(totalJuly26*100) / 100,
 		TotalAugust26:    math.Round(totalAugust26*100) / 100,
-		Persons:          persons,
-		RecentPurchases:  purchases,
-		ShippingPackages: packages,
+		Persons:          allowedPersons,
+		RecentPurchases:  allowedPurchases,
+		ShippingPackages: allPackages,
 	}, nil
 }
 

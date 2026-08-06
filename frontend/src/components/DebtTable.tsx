@@ -7,6 +7,7 @@ import { UserCheck, Clock, PlusCircle, CreditCard, ArrowRight } from 'lucide-rea
 interface DebtTableProps {
   persons: Person[];
   language: Language;
+  userRole?: string;
   onOpenPaymentModal: (person: Person) => void;
   onOpenPurchaseModal: () => void;
   onSelectPersonFilter: (personName: string) => void;
@@ -15,11 +16,13 @@ interface DebtTableProps {
 export const DebtTable: React.FC<DebtTableProps> = ({
   persons,
   language,
+  userRole,
   onOpenPaymentModal,
   onOpenPurchaseModal,
   onSelectPersonFilter,
 }) => {
   const t = translations[language];
+  const isAdmin = userRole === 'admin';
 
   return (
     <div className="glass-panel rounded-3xl p-6 mb-8 border border-slate-800">
@@ -31,13 +34,15 @@ export const DebtTable: React.FC<DebtTableProps> = ({
           <p className="text-xs text-slate-400">Click any person to view their specific purchase orders</p>
         </div>
 
-        <button
-          onClick={onOpenPurchaseModal}
-          className="flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/20 transition"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>{t.newPurchase}</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={onOpenPurchaseModal}
+            className="flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/20 transition"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>{t.newPurchase}</span>
+          </button>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -49,7 +54,7 @@ export const DebtTable: React.FC<DebtTableProps> = ({
               <th className="py-3 px-4">{t.paid}</th>
               <th className="py-3 px-4">{t.balance}</th>
               <th className="py-3 px-4">{t.status}</th>
-              <th className="py-3 px-4 text-right">{t.action}</th>
+              {isAdmin && <th className="py-3 px-4 text-right">{t.action}</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 text-sm">
@@ -93,18 +98,20 @@ export const DebtTable: React.FC<DebtTableProps> = ({
                       <span>{person.status}</span>
                     </span>
                   </td>
-                  <td className="py-4 px-4 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenPaymentModal(person);
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition inline-flex items-center space-x-1"
-                    >
-                      <CreditCard className="w-3.5 h-3.5" />
-                      <span>{t.recordPayment}</span>
-                    </button>
-                  </td>
+                  {isAdmin && (
+                    <td className="py-4 px-4 text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenPaymentModal(person);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition inline-flex items-center space-x-1"
+                      >
+                        <CreditCard className="w-3.5 h-3.5" />
+                        <span>{t.recordPayment}</span>
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}

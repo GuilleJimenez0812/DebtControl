@@ -6,10 +6,13 @@ import (
 )
 
 var (
-	ErrInvalidEmail    = errors.New("invalid email address")
-	ErrPasswordTooShort = errors.New("password must be at least 8 characters")
+	ErrInvalidEmail      = errors.New("invalid email address")
+	ErrPasswordTooShort   = errors.New("password must be at least 8 characters")
+	ErrUserAlreadyExists = errors.New("user with this email already exists")
+	ErrUserNotFound      = errors.New("user not found")
 )
 
+type Role = UserRole
 type UserRole string
 
 const (
