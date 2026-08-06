@@ -29,8 +29,16 @@ const DashboardContent: React.FC = () => {
   const queryClientInstance = useQueryClient();
 
   const [user, setUser] = useState<User | null>(null);
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguage] = useState<Language>(() => {
+    const savedLang = localStorage.getItem('debtcontrol_lang');
+    return (savedLang === 'en' || savedLang === 'es') ? savedLang : 'es';
+  });
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+
+  const handleLanguageChange = (newLang: Language) => {
+    setLanguage(newLang);
+    localStorage.setItem('debtcontrol_lang', newLang);
+  };
 
   const [activeTab, setActiveTab] = useState<'debts' | 'purchases'>('debts');
   const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>('All');
@@ -145,7 +153,7 @@ const DashboardContent: React.FC = () => {
       <Navbar
         user={user}
         language={language}
-        onLanguageChange={setLanguage}
+        onLanguageChange={handleLanguageChange}
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
         onOpenAuthModal={() => setIsAuthOpen(true)}
