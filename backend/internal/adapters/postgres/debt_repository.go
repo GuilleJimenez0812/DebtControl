@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"errors"
+	"regexp"
+	"strings"
 
 	"debtcontrol/backend/internal/core/domain"
 
@@ -134,18 +136,46 @@ func (repository *DebtRepository) FindPurchaseByID(ctx context.Context, id strin
 }
 
 func (repository *DebtRepository) FindPurchaseItemByOrderNumber(ctx context.Context, orderNumber string) (*domain.PurchaseItem, error) {
-	if orderNumber == "" {
+	trimmed := strings.TrimSpace(orderNumber)
+	if trimmed == "" {
 		return nil, nil
 	}
+
+	cleanNumber := extractCoreOrderNumber(trimmed)
+
+	// 1. Try exact match
 	var model PurchaseItemModel
-	err := repository.databaseConnection.WithContext(ctx).Where("order_number = ?", orderNumber).First(&model).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
+	err := repository.databaseConnection.WithContext(ctx).Where("order_number = ?", trimmed).First(&model).Error
+	if err == nil {
+		return repository.toDomainPurchaseItem(&model), nil
 	}
 
+	// 2. Try LIKE match with clean digits/hyphen number
+	if cleanNumber != "" {
+		err = repository.databaseConnection.WithContext(ctx).Where("order_number LIKE ?", "%"+cleanNumber+"%").First(&model).Error
+		if err == nil {
+			return repository.toDomainPurchaseItem(&model), nil
+		}
+	}
+
+	// 3. Fallback: Search all purchases and check if clean number matches
+	var allModels []PurchaseItemModel
+	err = repository.databaseConnection.WithContext(ctx).Find(&allModels).Error
+	if err == nil {
+		for _, m := range allModels {
+			mClean := extractCoreOrderNumber(m.OrderNumber)
+			if mClean != "" && cleanNumber != "" {
+				if strings.Contains(mClean, cleanNumber) || strings.Contains(cleanNumber, mClean) {
+					return repository.toDomainPurchaseItem(&m), nil
+				}
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+func (repository *DebtRepository) toDomainPurchaseItem(model *PurchaseItemModel) *domain.PurchaseItem {
 	return &domain.PurchaseItem{
 		ID:           model.ID,
 		PersonID:     model.PersonID,
@@ -160,7 +190,23 @@ func (repository *DebtRepository) FindPurchaseItemByOrderNumber(ctx context.Cont
 		InvoiceURL:   model.InvoiceURL,
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
-	}, nil
+	}
+}
+
+func extractCoreOrderNumber(input string) string {
+	re := regexp.MustCompile(`\b\d{3}-\d{7}-\d{7}\b`)
+	if match := re.FindString(input); match != "" {
+		return match
+	}
+	reDigits := regexp.MustCompile(`[0-9-]+`)
+	matches := reDigits.FindAllString(input, -1)
+	var longest string
+	for _, m := range matches {
+		if len(m) > len(longest) && len(m) >= 5 {
+			longest = m
+		}
+	}
+	return longest
 }
 
 func (repository *DebtRepository) SavePurchase(ctx context.Context, purchase *domain.PurchaseItem) error {

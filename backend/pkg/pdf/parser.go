@@ -67,13 +67,23 @@ func ParseInvoiceContent(content []byte) *ParsedInvoiceData {
 	lines := strings.Split(text, "\n")
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if len(trimmed) > 15 && !strings.Contains(trimmed, "http") && !strings.Contains(trimmed, "Resumen") && !strings.Contains(trimmed, "Pedido") {
+		if len(trimmed) > 10 &&
+			!strings.Contains(trimmed, "http") &&
+			!strings.Contains(trimmed, "Resumen") &&
+			!strings.Contains(trimmed, "Pedido") &&
+			!strings.Contains(trimmed, "/Filter") &&
+			!strings.Contains(trimmed, "/FlateDecode") &&
+			!strings.Contains(trimmed, "/Length") &&
+			!strings.Contains(trimmed, "<<") &&
+			!strings.Contains(trimmed, ">>") &&
+			!strings.Contains(trimmed, "stream") &&
+			!strings.Contains(trimmed, "endobj") {
 			data.Description = trimmed
 			break
 		}
 	}
-	if data.Description == "" {
-		data.Description = "Parsed Order " + data.OrderNumber
+	if data.Description == "" || strings.Contains(data.Description, "/Filter") || strings.Contains(data.Description, "<<") {
+		data.Description = "Invoice Order " + data.OrderNumber
 	}
 
 	return data
