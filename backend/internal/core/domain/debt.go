@@ -111,6 +111,7 @@ type PaymentTransaction struct {
 
 type ShippingPackage struct {
 	ID                 string    `json:"id"`
+	PurchaseItemID     string    `json:"purchase_item_id,omitempty"`
 	OrderNumber        string    `json:"order_number"`
 	TrackingNumber     string    `json:"tracking_number"`
 	ShippingCost       float64   `json:"shipping_cost"`

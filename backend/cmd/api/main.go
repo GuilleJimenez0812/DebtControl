@@ -80,8 +80,10 @@ func main() {
 	log.Println("Database migrations completed successfully.")
 
 	userRepository := postgresAdapter.NewUserRepository(databaseConnection)
+	debtRepository := postgresAdapter.NewDebtRepository(databaseConnection)
 	ctx := context.Background()
 	_ = userRepository.EnsureFirstUserIsAdmin(ctx)
+	_ = debtRepository.EnsurePurchaseItemForeignKey(ctx)
 
 	var sessionRepository ports.SessionStore
 	redisHost := os.Getenv("REDIS_HOST")
@@ -99,7 +101,6 @@ func main() {
 		log.Println("Redis is disabled. Using in-memory session store fallback.")
 	}
 
-	debtRepository := postgresAdapter.NewDebtRepository(databaseConnection)
 	auditRepository := postgresAdapter.NewAuditRepository(databaseConnection)
 
 	jwtSecret := getEnvOrDefault("JWT_SECRET", "super-secret-debtcontrol-jwt-key-2026")

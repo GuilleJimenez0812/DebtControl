@@ -5,6 +5,7 @@ import (
 
 	"debtcontrol/backend/internal/core/domain"
 	"debtcontrol/backend/internal/core/ports"
+	errorsAdapter "debtcontrol/backend/pkg/errors"
 
 	"github.com/gin-gonic/gin"
 )
@@ -106,6 +107,38 @@ func (handler *DebtHandler) UpdatePurchase(ginContext *gin.Context) {
 		"message":  "purchase item updated successfully",
 		"purchase": purchase,
 	})
+}
+
+func (handler *DebtHandler) ReassignPurchase(ginContext *gin.Context) {
+	id := ginContext.Param("id")
+	var requestPayload ReassignPurchaseRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	purchase, err := handler.debtUseCase.ReassignPurchaseToPerson(ginContext.Request.Context(), id, requestPayload.PersonID)
+	if err != nil {
+		errorsAdapter.MapDomainErrorToHTTP(ginContext, err)
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{
+		"message":  "purchase item reassigned successfully",
+		"purchase": purchase,
+	})
+}
+
+func (handler *DebtHandler) DeletePurchase(ginContext *gin.Context) {
+	id := ginContext.Param("id")
+
+	err := handler.debtUseCase.DeletePurchase(ginContext.Request.Context(), id)
+	if err != nil {
+		errorsAdapter.MapDomainErrorToHTTP(ginContext, err)
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"message": "purchase item deleted successfully"})
 }
 
 func (handler *DebtHandler) UpdatePackage(ginContext *gin.Context) {

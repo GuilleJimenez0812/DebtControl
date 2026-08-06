@@ -111,6 +111,18 @@ export const apiService = {
     return response.data;
   },
 
+  reassignPurchase: async (purchaseId: string, personId: string): Promise<{ purchase: PurchaseItem }> => {
+    const response = await apiClient.put<{ purchase: PurchaseItem }>(`/debts/purchases/${purchaseId}/person`, {
+      person_id: personId,
+    });
+    return response.data;
+  },
+
+  deletePurchase: async (purchaseId: string): Promise<{ message: string }> => {
+    const response = await apiClient.delete<{ message: string }>(`/debts/purchases/${purchaseId}`);
+    return response.data;
+  },
+
   updatePackage: async (
     id: string,
     payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }

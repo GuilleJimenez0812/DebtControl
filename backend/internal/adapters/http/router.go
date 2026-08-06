@@ -50,6 +50,8 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 			debtGroup.POST("/purchases/upload-invoice", RequireAdminRole(), debtHandler.UploadInvoice)
 			debtGroup.POST("/purchases/confirm-invoice", RequireAdminRole(), debtHandler.ConfirmAttachInvoice)
 			debtGroup.PUT("/purchases/:id", RequireAdminRole(), debtHandler.UpdatePurchase)
+			debtGroup.PUT("/purchases/:id/person", RequireAdminRole(), debtHandler.ReassignPurchase)
+			debtGroup.DELETE("/purchases/:id", RequireAdminRole(), debtHandler.DeletePurchase)
 			debtGroup.POST("/purchases/:id/packages", RequireAdminRole(), debtHandler.CreatePackage)
 			debtGroup.PUT("/packages/:id", RequireAdminRole(), debtHandler.UpdatePackage)
 			debtGroup.POST("/payments", RequireAdminRole(), debtHandler.RecordPayment)

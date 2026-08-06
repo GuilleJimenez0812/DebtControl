@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import type { PurchaseItem, ShippingPackage } from '../types';
+import type { PurchaseItem, ShippingPackage, Person } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { X, FileText, Edit2, Save, Package, Eye } from 'lucide-react';
+import { X, FileText, Edit2, Save, Package, Eye, UserCog, Trash2 } from 'lucide-react';
 
 interface PurchaseDetailModalProps {
   purchase: PurchaseItem | null;
   packages: ShippingPackage[];
+  persons?: Person[];
   isOpen: boolean;
   language: Language;
   userRole?: string;
@@ -15,11 +16,14 @@ interface PurchaseDetailModalProps {
   onUpdatePurchase: (id: string, payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string }) => Promise<void>;
   onUpdatePackage: (id: string, payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
   onCreatePackage?: (purchaseId: string, trackingNumber: string, shippingCost: number) => Promise<void>;
+  onReassignPurchase?: (purchaseId: string, personId: string) => Promise<void>;
+  onDeletePurchase?: (purchaseId: string) => Promise<void>;
 }
 
 export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   purchase,
   packages,
+  persons,
   isOpen,
   language,
   userRole,
@@ -28,6 +32,8 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   onUpdatePurchase,
   onUpdatePackage,
   onCreatePackage,
+  onReassignPurchase,
+  onDeletePurchase,
 }) => {
   const t = translations[language];
   const isAdmin = userRole === 'admin';
@@ -49,6 +55,13 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const [newPkgShippingCost, setNewPkgShippingCost] = useState<number>(0);
   const [isSubmittingTracking, setIsSubmittingTracking] = useState<boolean>(false);
 
+  const [isReassigning, setIsReassigning] = useState<boolean>(false);
+  const [reassignTargetId, setReassignTargetId] = useState<string>('');
+  const [isSubmittingReassign, setIsSubmittingReassign] = useState<boolean>(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  const [isSubmittingDelete, setIsSubmittingDelete] = useState<boolean>(false);
+  const [actionError, setActionError] = useState<string>('');
+
   if (!isOpen || !purchase) return null;
 
   const relatedPackages = packages.filter(
@@ -58,6 +71,10 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const attachedInvoices = purchase.invoice_url
     ? purchase.invoice_url.split(',').map((s) => s.trim()).filter(Boolean)
     : [];
+
+  const originalPerson = persons?.find((p) => p.id === purchase.person_id);
+  const hasRecordedPayments = (originalPerson?.total_paid ?? 0) > 0;
+  const reassignCandidates = (persons || []).filter((p) => p.id !== purchase.person_id);
 
   const handleSavePurchase = async () => {
     await onUpdatePurchase(purchase.id, {
@@ -99,6 +116,37 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
       console.error("Failed to add tracking:", error);
     } finally {
       setIsSubmittingTracking(false);
+    }
+  };
+
+  const handleReassign = async () => {
+    if (!reassignTargetId || !onReassignPurchase) return;
+    setIsSubmittingReassign(true);
+    setActionError('');
+    try {
+      await onReassignPurchase(purchase.id, reassignTargetId);
+      setReassignTargetId('');
+      setIsReassigning(false);
+    } catch (error) {
+      console.error("Failed to reassign order:", error);
+      setActionError(t.reassignFailed);
+    } finally {
+      setIsSubmittingReassign(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDeletePurchase) return;
+    setIsSubmittingDelete(true);
+    setActionError('');
+    try {
+      await onDeletePurchase(purchase.id);
+      setShowDeleteConfirm(false);
+    } catch (error) {
+      console.error("Failed to delete order:", error);
+      setActionError(t.deleteFailed);
+    } finally {
+      setIsSubmittingDelete(false);
     }
   };
 
@@ -409,6 +457,101 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                   >
                     <X className="w-4 h-4" />
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+          {/* Admin Actions: Reassign & Delete */}
+          {isAdmin && (
+            <div className="mt-6 pt-4 border-t border-slate-800/80 space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">{t.adminCorrections}</h4>
+
+              {actionError && (
+                <p className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-xl p-2.5">
+                  {actionError}
+                </p>
+              )}
+
+              {!isReassigning ? (
+                <button
+                  onClick={() => setIsReassigning(true)}
+                  className="flex items-center space-x-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 rounded-xl transition"
+                >
+                  <UserCog className="w-3.5 h-3.5" />
+                  <span>{t.reassign}</span>
+                </button>
+              ) : (
+                <div className="glass-card p-4 rounded-2xl space-y-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">{t.reassignAction}</label>
+                    <select
+                      value={reassignTargetId}
+                      onChange={(e) => setReassignTargetId(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white"
+                    >
+                      <option value="">{t.selectPersonPlaceholder}</option>
+                      {reassignCandidates.map((person) => (
+                        <option key={person.id} value={person.id}>{person.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {hasRecordedPayments && (
+                    <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5">
+                      {t.paymentsStayWarning}
+                    </p>
+                  )}
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handleReassign}
+                      disabled={isSubmittingReassign || !reassignTargetId}
+                      className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-semibold px-4 py-2 rounded-xl transition"
+                    >
+                      {isSubmittingReassign ? t.reassigning : t.reassignAction}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsReassigning(false);
+                        setReassignTargetId('');
+                      }}
+                      disabled={isSubmittingReassign}
+                      className="text-xs text-slate-400 hover:text-white p-2"
+                    >
+                      {t.cancel}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!showDeleteConfirm ? (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center space-x-1.5 text-xs text-rose-400 hover:text-rose-300 font-semibold border border-rose-500/30 bg-rose-500/10 px-4 py-2 rounded-xl transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{t.deleteOrder}</span>
+                </button>
+              ) : (
+                <div className="glass-card p-4 rounded-2xl border-rose-500/30 space-y-3">
+                  <p className="text-xs font-bold text-rose-300">{t.deleteOrderConfirmTitle}</p>
+                  <p className="text-xs text-slate-400">{t.deleteOrderConfirmBody}</p>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handleDelete}
+                      disabled={isSubmittingDelete}
+                      className="text-xs bg-rose-600 hover:bg-rose-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-semibold px-4 py-2 rounded-xl transition"
+                    >
+                      {isSubmittingDelete ? t.deleting : t.confirmDelete}
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      disabled={isSubmittingDelete}
+                      className="text-xs text-slate-400 hover:text-white p-2"
+                    >
+                      {t.cancel}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -46,6 +46,7 @@ export interface PaymentTransaction {
 
 export interface ShippingPackage {
   id: string;
+  purchase_item_id?: string;
   order_number: string;
   tracking_number: string;
   shipping_cost: number;
