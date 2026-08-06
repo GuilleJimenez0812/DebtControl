@@ -123,8 +123,7 @@ func (repository *UserRepository) EnsureFirstUserIsAdmin(ctx context.Context) er
 	}
 
 	if firstUser.Role != string(domain.RoleAdmin) {
-		firstUser.Role = string(domain.RoleAdmin)
-		return repository.databaseConnection.WithContext(ctx).Model(&UserModel{}).Where("id = ?", firstUser.ID).Update("role", string(domain.RoleAdmin)).Error
+		return repository.databaseConnection.WithContext(ctx).Exec("UPDATE users SET role = ? WHERE id = ?", string(domain.RoleAdmin), firstUser.ID).Error
 	}
 
 	return nil
