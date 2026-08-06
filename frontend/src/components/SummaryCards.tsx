@@ -2,7 +2,7 @@ import React from 'react';
 import type { Person } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { DollarSign, Wallet, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Wallet, ArrowUpRight, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface SummaryCardsProps {
   persons: Person[];
@@ -46,21 +46,20 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
             </h2>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="flex flex-wrap items-center gap-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 min-w-[280px]">
+          {/* Minimalist Payment Completion Progress Bar */}
+          <div className="flex items-center space-x-4 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 min-w-[240px]">
+            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+              <TrendingUp className="w-5 h-5" />
+            </div>
             <div className="flex-1">
-              <div className="flex justify-between text-xs text-slate-400 mb-1 font-semibold">
-                <span>{t.paid}: ${grandTotalPaid.toFixed(2)}</span>
-                <span>{t.totalOwed}: ${grandTotalOwed.toFixed(2)}</span>
-              </div>
-              <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden mb-1.5">
                 <div
                   className="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 transition-all duration-500"
                   style={{ width: `${Math.min(100, Math.max(0, paymentProgress))}%` }}
                 ></div>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1.5 text-right font-mono font-medium">
-                {paymentProgress.toFixed(0)}% {language === 'es' ? 'completado' : 'paid off'}
+              <p className="text-xs font-bold text-slate-200 font-mono">
+                {paymentProgress.toFixed(0)}% {language === 'es' ? 'Completado' : 'Completed'}
               </p>
             </div>
           </div>
