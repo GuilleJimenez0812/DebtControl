@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type UserModel struct {
@@ -45,19 +47,20 @@ func (PersonModel) TableName() string {
 }
 
 type PurchaseItemModel struct {
-	ID           string    `gorm:"primaryKey;type:varchar(64)"`
-	PersonID     string    `gorm:"index;type:varchar(64);not null"`
-	PersonName   string    `gorm:"type:varchar(255)"`
-	OrderNumber  string    `gorm:"type:varchar(255)"`
-	Description  string    `gorm:"type:text"`
-	ItemAmount   float64   `gorm:"type:numeric(10,2);default:0"`
-	TaxAmount    float64   `gorm:"type:numeric(10,2);default:0"`
-	ShippingCost float64   `gorm:"type:numeric(10,2);default:0"`
-	TotalCost    float64   `gorm:"type:numeric(10,2);default:0"`
-	DetailPeriod string    `gorm:"type:varchar(50)"`
-	InvoiceURL   string    `gorm:"type:text"`
-	CreatedAt    time.Time `gorm:"autoCreateTime"`
-	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
+	ID           string         `gorm:"primaryKey;type:varchar(64)"`
+	PersonID     string         `gorm:"index;type:varchar(64);not null"`
+	PersonName   string         `gorm:"type:varchar(255)"`
+	OrderNumber  string         `gorm:"type:varchar(255)"`
+	Description  string         `gorm:"type:text"`
+	ItemAmount   float64        `gorm:"type:numeric(10,2);default:0"`
+	TaxAmount    float64        `gorm:"type:numeric(10,2);default:0"`
+	ShippingCost float64        `gorm:"type:numeric(10,2);default:0"`
+	TotalCost    float64        `gorm:"type:numeric(10,2);default:0"`
+	DetailPeriod string         `gorm:"type:varchar(50)"`
+	InvoiceURL   string         `gorm:"type:text"`
+	CreatedAt    time.Time      `gorm:"autoCreateTime"`
+	UpdatedAt    time.Time      `gorm:"autoUpdateTime"`
+	DeletedAt    gorm.DeletedAt `gorm:"index"`
 }
 
 func (PurchaseItemModel) TableName() string {
@@ -77,17 +80,19 @@ func (PaymentTransactionModel) TableName() string {
 }
 
 type ShippingPackageModel struct {
-	ID                 string    `gorm:"primaryKey;type:varchar(64)"`
-	OrderNumber        string    `gorm:"type:varchar(255)"`
-	TrackingNumber     string    `gorm:"type:varchar(255)"`
-	ShippingCost       float64   `gorm:"type:numeric(10,2);default:0"`
-	ItemDescription    string    `gorm:"type:text"`
-	WarehouseReceived  bool      `gorm:"default:false"`
-	PersonallyReceived bool      `gorm:"default:false"`
-	DispatchDate       string    `gorm:"type:varchar(100)"`
-	BatchMonth         string    `gorm:"type:varchar(50)"`
-	CreatedAt          time.Time `gorm:"autoCreateTime"`
-	UpdatedAt          time.Time `gorm:"autoUpdateTime"`
+	ID                 string         `gorm:"primaryKey;type:varchar(64)"`
+	PurchaseItemID     string         `gorm:"index;type:varchar(64)"`
+	OrderNumber        string         `gorm:"type:varchar(255)"`
+	TrackingNumber     string         `gorm:"type:varchar(255)"`
+	ShippingCost       float64        `gorm:"type:numeric(10,2);default:0"`
+	ItemDescription    string         `gorm:"type:text"`
+	WarehouseReceived  bool           `gorm:"default:false"`
+	PersonallyReceived bool           `gorm:"default:false"`
+	DispatchDate       string         `gorm:"type:varchar(100)"`
+	BatchMonth         string         `gorm:"type:varchar(50)"`
+	CreatedAt          time.Time      `gorm:"autoCreateTime"`
+	UpdatedAt          time.Time      `gorm:"autoUpdateTime"`
+	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
 func (ShippingPackageModel) TableName() string {

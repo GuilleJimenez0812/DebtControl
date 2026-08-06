@@ -5,17 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
-)
+	"debtcontrol/backend/internal/core/domain"
 
-var (
-	ErrInvalidEmail       = errors.New("invalid email address")
-	ErrPasswordTooShort   = errors.New("password must be at least 8 characters")
-	ErrUserAlreadyExists  = errors.New("user with this email already exists")
-	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrPersonNotFound     = errors.New("person not found")
-	ErrInvalidAmount       = errors.New("amount must be greater than zero")
-	ErrUnauthorized       = errors.New("unauthorized access")
+	"github.com/gin-gonic/gin"
 )
 
 type APIErrorResponse struct {
@@ -33,21 +25,21 @@ func MapDomainErrorToHTTP(ginContext *gin.Context, domainErr error) {
 	var errorCode string
 
 	switch {
-	case errors.Is(domainErr, ErrInvalidEmail), errors.Is(domainErr, ErrPasswordTooShort), errors.Is(domainErr, ErrInvalidAmount):
+	case errors.Is(domainErr, domain.ErrInvalidAmount):
 		statusCode = http.StatusBadRequest
 		errorCode = "BAD_REQUEST"
 
-	case errors.Is(domainErr, ErrUserAlreadyExists):
-		statusCode = http.StatusConflict
-		errorCode = "USER_ALREADY_EXISTS"
-
-	case errors.Is(domainErr, ErrInvalidCredentials), errors.Is(domainErr, ErrUnauthorized):
-		statusCode = http.StatusUnauthorized
-		errorCode = "UNAUTHORIZED"
-
-	case errors.Is(domainErr, ErrPersonNotFound):
+	case errors.Is(domainErr, domain.ErrPersonNotFound):
 		statusCode = http.StatusNotFound
 		errorCode = "PERSON_NOT_FOUND"
+
+	case errors.Is(domainErr, domain.ErrPurchaseItemNotFound):
+		statusCode = http.StatusNotFound
+		errorCode = "PURCHASE_ITEM_NOT_FOUND"
+
+	case errors.Is(domainErr, domain.ErrPackageNotFound):
+		statusCode = http.StatusNotFound
+		errorCode = "PACKAGE_NOT_FOUND"
 
 	default:
 		statusCode = http.StatusInternalServerError

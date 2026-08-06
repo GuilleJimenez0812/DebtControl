@@ -103,6 +103,23 @@ const DashboardContent: React.FC = () => {
     },
   });
 
+  const reassignPurchaseMutation = useMutation({
+    mutationFn: ({ id, personId }: { id: string; personId: string }) =>
+      apiService.reassignPurchase(id, personId),
+    onSuccess: () => {
+      queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
+      setSelectedPurchaseForModal(null);
+    },
+  });
+
+  const deletePurchaseMutation = useMutation({
+    mutationFn: (id: string) => apiService.deletePurchase(id),
+    onSuccess: () => {
+      queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
+      setSelectedPurchaseForModal(null);
+    },
+  });
+
   const createPackageMutation = useMutation({
     mutationFn: ({ purchaseId, trackingNumber, shippingCost }: { purchaseId: string; trackingNumber: string; shippingCost: number }) =>
       apiService.createPackage(purchaseId, trackingNumber, shippingCost),
@@ -348,6 +365,7 @@ const DashboardContent: React.FC = () => {
       <PurchaseDetailModal
         purchase={selectedPurchaseForModal}
         packages={summary?.shipping_packages || []}
+        persons={summary?.persons || []}
         isOpen={!!selectedPurchaseForModal}
         language={language}
         userRole={user?.role}
@@ -362,6 +380,12 @@ const DashboardContent: React.FC = () => {
         }}
         onCreatePackage={async (purchaseId, trackingNumber, shippingCost) => {
           await createPackageMutation.mutateAsync({ purchaseId, trackingNumber, shippingCost });
+        }}
+        onReassignPurchase={async (purchaseId, personId) => {
+          await reassignPurchaseMutation.mutateAsync({ id: purchaseId, personId });
+        }}
+        onDeletePurchase={async (purchaseId) => {
+          await deletePurchaseMutation.mutateAsync(purchaseId);
         }}
       />
     </div>

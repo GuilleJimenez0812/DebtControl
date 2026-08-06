@@ -39,13 +39,16 @@ type DebtRepository interface {
 
 	FindAllPackages(ctx context.Context) ([]*domain.ShippingPackage, error)
 	FindPackagesByOrderNumber(ctx context.Context, orderNumber string) ([]*domain.ShippingPackage, error)
+	FindPackagesByPurchaseID(ctx context.Context, purchaseID string) ([]*domain.ShippingPackage, error)
 	FindPackageByID(ctx context.Context, id string) (*domain.ShippingPackage, error)
 	SavePackage(ctx context.Context, pkg *domain.ShippingPackage) error
+	DeletePackagesByPurchaseID(ctx context.Context, purchaseID string) error
 
 	SearchOrders(ctx context.Context, query string, personIDs []string, limit int) ([]*SearchResult, error)
 
 	RecalculateAllBalances(ctx context.Context) error
 	ResetAllData(ctx context.Context) error
+	RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
 type SessionStore interface {
@@ -109,6 +112,8 @@ type DebtUseCase interface {
 	UpdatePurchaseItem(ctx context.Context, id string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string) (*domain.PurchaseItem, error)
 	UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error)
 	CreateShippingPackage(ctx context.Context, purchaseID string, trackingNumber string, shippingCost float64) (*domain.ShippingPackage, error)
+	ReassignPurchaseToPerson(ctx context.Context, orderID string, newPersonID string) (*domain.PurchaseItem, error)
+	DeletePurchase(ctx context.Context, orderID string) error
 	RecordPayment(ctx context.Context, personID string, amount float64, notes string) (*domain.PaymentTransaction, error)
 	ProcessInvoiceUpload(ctx context.Context, fileBytes []byte, filename string) (*ParseInvoiceResult, error)
 	ConfirmAttachInvoice(ctx context.Context, purchaseID string, invoiceFilename string, mode string) (*domain.PurchaseItem, error)

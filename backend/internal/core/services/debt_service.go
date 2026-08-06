@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -255,6 +256,7 @@ func (service *DebtService) CreateShippingPackage(ctx context.Context, purchaseI
 
 	pkg := &domain.ShippingPackage{
 		ID:                 uuid.New().String(),
+		PurchaseItemID:     purchase.ID,
 		OrderNumber:        purchase.OrderNumber,
 		TrackingNumber:     trackingNumber,
 		ShippingCost:       shippingCost,
@@ -277,6 +279,74 @@ func (service *DebtService) CreateShippingPackage(ctx context.Context, purchaseI
 	_ = service.syncPurchaseShippingCost(ctx, purchase.OrderNumber)
 
 	return pkg, nil
+}
+
+func (service *DebtService) ReassignPurchaseToPerson(ctx context.Context, orderID string, newPersonID string) (*domain.PurchaseItem, error) {
+	var reassigned *domain.PurchaseItem
+	err := service.debtRepo.RunInTransaction(ctx, func(txCtx context.Context) error {
+		item, err := service.debtRepo.FindPurchaseByID(txCtx, orderID)
+		if err != nil {
+			return err
+		}
+		if item == nil {
+			return domain.ErrPurchaseItemNotFound
+		}
+
+		person, err := service.debtRepo.FindPersonByID(txCtx, newPersonID)
+		if err != nil {
+			return err
+		}
+		if person == nil {
+			return domain.ErrPersonNotFound
+		}
+
+		oldPersonID := item.PersonID
+		oldPersonName := item.PersonName
+
+		item.PersonID = person.ID
+		item.PersonName = person.Name
+		item.UpdatedAt = time.Now()
+
+		if err := service.debtRepo.SavePurchase(txCtx, item); err != nil {
+			return err
+		}
+
+		if oldPersonID != person.ID {
+			service.logAudit(txCtx, "UPDATE", "PurchaseItem", item.ID,
+				fmt.Sprintf("Reassigned order %s from person %s to person %s", item.OrderNumber, oldPersonName, person.Name))
+		}
+
+		reassigned = item
+		return service.debtRepo.RecalculateAllBalances(txCtx)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return reassigned, nil
+}
+
+func (service *DebtService) DeletePurchase(ctx context.Context, orderID string) error {
+	return service.debtRepo.RunInTransaction(ctx, func(txCtx context.Context) error {
+		item, err := service.debtRepo.FindPurchaseByID(txCtx, orderID)
+		if err != nil {
+			return err
+		}
+		if item == nil {
+			return domain.ErrPurchaseItemNotFound
+		}
+
+		if err := service.debtRepo.DeletePurchase(txCtx, orderID); err != nil {
+			return err
+		}
+		if err := service.debtRepo.DeletePackagesByPurchaseID(txCtx, orderID); err != nil {
+			return err
+		}
+
+		service.logAudit(txCtx, "DELETE", "PurchaseItem", item.ID,
+			fmt.Sprintf("Deleted order %s - %s ($%.2f)", item.OrderNumber, item.Description, item.TotalCost))
+
+		return service.debtRepo.RecalculateAllBalances(txCtx)
+	})
 }
 
 func (service *DebtService) RecordPayment(ctx context.Context, personID string, amount float64, notes string) (*domain.PaymentTransaction, error) {
@@ -390,6 +460,7 @@ func (service *DebtService) forceSeedData(ctx context.Context) error {
 		{"Vale", "Pedido n.º 113-4750100-0765027", "Pedido n.º 113-4750100-0765027", 32.23, 0.00, 0.00, 32.23, "Agosto-26"},
 	}
 
+	purchaseIDByOrderNumber := make(map[string]string)
 	for _, item := range purchases {
 		person, exists := personMap[item.PersonName]
 		if !exists {
@@ -411,6 +482,7 @@ func (service *DebtService) forceSeedData(ctx context.Context) error {
 			UpdatedAt:    time.Now(),
 		}
 		_ = service.debtRepo.SavePurchase(ctx, newItem)
+		purchaseIDByOrderNumber[newItem.OrderNumber] = newItem.ID
 		person.TotalOwed += newItem.TotalCost
 	}
 
@@ -450,6 +522,7 @@ func (service *DebtService) forceSeedData(ctx context.Context) error {
 	for _, pkg := range packages {
 		newPkg := &domain.ShippingPackage{
 			ID:                uuid.New().String(),
+			PurchaseItemID:    purchaseIDByOrderNumber[pkg.OrderNumber],
 			OrderNumber:       pkg.OrderNumber,
 			TrackingNumber:    pkg.TrackingNumber,
 			ShippingCost:      pkg.Cost,

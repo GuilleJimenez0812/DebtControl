@@ -45,3 +45,7 @@ type RecordPaymentRequest struct {
 	AmountPaid float64 `json:"amount_paid" binding:"gt=0"`
 	Notes      string  `json:"notes"`
 }
+
+type ReassignPurchaseRequest struct {
+	PersonID string `json:"person_id" binding:"required"`
+}

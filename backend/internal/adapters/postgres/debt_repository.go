@@ -22,9 +22,25 @@ func NewDebtRepository(databaseConnection *gorm.DB) *DebtRepository {
 	}
 }
 
+type transactionContextKey struct{}
+
+func (repository *DebtRepository) RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error {
+	return repository.databaseConnection.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txCtx := context.WithValue(ctx, transactionContextKey{}, tx)
+		return fn(txCtx)
+	})
+}
+
+func (repository *DebtRepository) db(ctx context.Context) *gorm.DB {
+	if tx, ok := ctx.Value(transactionContextKey{}).(*gorm.DB); ok {
+		return tx.WithContext(ctx)
+	}
+	return repository.databaseConnection.WithContext(ctx)
+}
+
 func (repository *DebtRepository) FindAllPersons(ctx context.Context) ([]*domain.Person, error) {
 	var models []PersonModel
-	err := repository.databaseConnection.WithContext(ctx).Order("name ASC").Find(&models).Error
+	err := repository.db(ctx).Order("name ASC").Find(&models).Error
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +63,7 @@ func (repository *DebtRepository) FindAllPersons(ctx context.Context) ([]*domain
 
 func (repository *DebtRepository) FindPersonByID(ctx context.Context, id string) (*domain.Person, error) {
 	var model PersonModel
-	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).First(&model).Error
+	err := repository.db(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -78,12 +94,12 @@ func (repository *DebtRepository) SavePerson(ctx context.Context, person *domain
 		CreatedAt: person.CreatedAt,
 		UpdatedAt: person.UpdatedAt,
 	}
-	return repository.databaseConnection.WithContext(ctx).Save(&model).Error
+	return repository.db(ctx).Save(&model).Error
 }
 
 func (repository *DebtRepository) FindAllPurchases(ctx context.Context) ([]*domain.PurchaseItem, error) {
 	var models []PurchaseItemModel
-	err := repository.databaseConnection.WithContext(ctx).Order("created_at DESC").Find(&models).Error
+	err := repository.db(ctx).Order("created_at DESC").Find(&models).Error
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +127,7 @@ func (repository *DebtRepository) FindAllPurchases(ctx context.Context) ([]*doma
 
 func (repository *DebtRepository) FindPurchaseByID(ctx context.Context, id string) (*domain.PurchaseItem, error) {
 	var model PurchaseItemModel
-	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).First(&model).Error
+	err := repository.db(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -146,14 +162,14 @@ func (repository *DebtRepository) FindPurchaseItemByOrderNumber(ctx context.Cont
 
 	// 1. Try exact match
 	var model PurchaseItemModel
-	err := repository.databaseConnection.WithContext(ctx).Where("order_number = ?", trimmed).First(&model).Error
+	err := repository.db(ctx).Where("order_number = ?", trimmed).First(&model).Error
 	if err == nil {
 		return repository.toDomainPurchaseItem(&model), nil
 	}
 
 	// 2. Try LIKE match with clean digits/hyphen number
 	if cleanNumber != "" {
-		err = repository.databaseConnection.WithContext(ctx).Where("order_number LIKE ?", "%"+cleanNumber+"%").First(&model).Error
+		err = repository.db(ctx).Where("order_number LIKE ?", "%"+cleanNumber+"%").First(&model).Error
 		if err == nil {
 			return repository.toDomainPurchaseItem(&model), nil
 		}
@@ -161,7 +177,7 @@ func (repository *DebtRepository) FindPurchaseItemByOrderNumber(ctx context.Cont
 
 	// 3. Fallback: Search all purchases and check if clean number matches
 	var allModels []PurchaseItemModel
-	err = repository.databaseConnection.WithContext(ctx).Find(&allModels).Error
+	err = repository.db(ctx).Find(&allModels).Error
 	if err == nil {
 		for _, m := range allModels {
 			mClean := extractCoreOrderNumber(m.OrderNumber)
@@ -183,7 +199,7 @@ func (repository *DebtRepository) SearchOrders(ctx context.Context, query string
 
 	searchQuery := "%" + query + "%"
 	
-	db := repository.databaseConnection.WithContext(ctx)
+	db := repository.db(ctx)
 
 	// Build the query joining purchase_items and shipping_packages
 	// We use DISTINCT ON (purchase_items.id) to avoid duplicates if multiple tracking numbers match
@@ -196,8 +212,8 @@ func (repository *DebtRepository) SearchOrders(ctx context.Context, query string
 			pi.total_cost,
 			sp.tracking_number
 		FROM purchase_items pi
-		LEFT JOIN shipping_packages sp ON pi.order_number = sp.order_number
-		WHERE (pi.order_number ILIKE ? OR sp.tracking_number ILIKE ?)
+		LEFT JOIN shipping_packages sp ON pi.order_number = sp.order_number AND sp.deleted_at IS NULL
+		WHERE pi.deleted_at IS NULL AND (pi.order_number ILIKE ? OR sp.tracking_number ILIKE ?)
 	`
 	args := []interface{}{searchQuery, searchQuery}
 
@@ -249,6 +265,23 @@ func (repository *DebtRepository) toDomainPurchaseItem(model *PurchaseItemModel)
 	}
 }
 
+func (repository *DebtRepository) toDomainShippingPackage(model *ShippingPackageModel) *domain.ShippingPackage {
+	return &domain.ShippingPackage{
+		ID:                 model.ID,
+		PurchaseItemID:     model.PurchaseItemID,
+		OrderNumber:        model.OrderNumber,
+		TrackingNumber:     model.TrackingNumber,
+		ShippingCost:       model.ShippingCost,
+		ItemDescription:    model.ItemDescription,
+		WarehouseReceived:  model.WarehouseReceived,
+		PersonallyReceived: model.PersonallyReceived,
+		DispatchDate:       model.DispatchDate,
+		BatchMonth:         model.BatchMonth,
+		CreatedAt:          model.CreatedAt,
+		UpdatedAt:          model.UpdatedAt,
+	}
+}
+
 func extractCoreOrderNumber(input string) string {
 	re := regexp.MustCompile(`\b\d{3}-\d{7}-\d{7}\b`)
 	if match := re.FindString(input); match != "" {
@@ -281,16 +314,16 @@ func (repository *DebtRepository) SavePurchase(ctx context.Context, purchase *do
 		CreatedAt:    purchase.CreatedAt,
 		UpdatedAt:    purchase.UpdatedAt,
 	}
-	return repository.databaseConnection.WithContext(ctx).Save(&model).Error
+	return repository.db(ctx).Save(&model).Error
 }
 
 func (repository *DebtRepository) DeletePurchase(ctx context.Context, id string) error {
-	return repository.databaseConnection.WithContext(ctx).Where("id = ?", id).Delete(&PurchaseItemModel{}).Error
+	return repository.db(ctx).Where("id = ?", id).Delete(&PurchaseItemModel{}).Error
 }
 
 func (repository *DebtRepository) FindPaymentsByPersonID(ctx context.Context, personID string) ([]*domain.PaymentTransaction, error) {
 	var models []PaymentTransactionModel
-	err := repository.databaseConnection.WithContext(ctx).Where("person_id = ?", personID).Order("payment_date DESC").Find(&models).Error
+	err := repository.db(ctx).Where("person_id = ?", personID).Order("payment_date DESC").Find(&models).Error
 	if err != nil {
 		return nil, err
 	}
@@ -316,64 +349,54 @@ func (repository *DebtRepository) SavePayment(ctx context.Context, payment *doma
 		Notes:       payment.Notes,
 		PaymentDate: payment.PaymentDate,
 	}
-	return repository.databaseConnection.WithContext(ctx).Save(&model).Error
+	return repository.db(ctx).Save(&model).Error
 }
 
 func (repository *DebtRepository) FindAllPackages(ctx context.Context) ([]*domain.ShippingPackage, error) {
 	var models []ShippingPackageModel
-	err := repository.databaseConnection.WithContext(ctx).Order("created_at ASC").Find(&models).Error
+	err := repository.db(ctx).Order("created_at ASC").Find(&models).Error
 	if err != nil {
 		return nil, err
 	}
 
 	packages := make([]*domain.ShippingPackage, len(models))
 	for index, model := range models {
-		packages[index] = &domain.ShippingPackage{
-			ID:                 model.ID,
-			OrderNumber:        model.OrderNumber,
-			TrackingNumber:     model.TrackingNumber,
-			ShippingCost:       model.ShippingCost,
-			ItemDescription:    model.ItemDescription,
-			WarehouseReceived:  model.WarehouseReceived,
-			PersonallyReceived: model.PersonallyReceived,
-			DispatchDate:       model.DispatchDate,
-			BatchMonth:         model.BatchMonth,
-			CreatedAt:          model.CreatedAt,
-			UpdatedAt:          model.UpdatedAt,
-		}
+		packages[index] = repository.toDomainShippingPackage(&model)
 	}
 	return packages, nil
 }
 
-func (repository *DebtRepository) FindPackagesByOrderNumber(ctx context.Context, orderNumber string) ([]*domain.ShippingPackage, error) {
+func (repository *DebtRepository) FindPackagesByPurchaseID(ctx context.Context, purchaseID string) ([]*domain.ShippingPackage, error) {
 	var models []ShippingPackageModel
-	err := repository.databaseConnection.WithContext(ctx).Where("order_number = ?", orderNumber).Find(&models).Error
+	err := repository.db(ctx).Where("purchase_item_id = ?", purchaseID).Find(&models).Error
 	if err != nil {
 		return nil, err
 	}
 
 	packages := make([]*domain.ShippingPackage, 0, len(models))
 	for _, model := range models {
-		packages = append(packages, &domain.ShippingPackage{
-			ID:                 model.ID,
-			OrderNumber:        model.OrderNumber,
-			TrackingNumber:     model.TrackingNumber,
-			ShippingCost:       model.ShippingCost,
-			ItemDescription:    model.ItemDescription,
-			WarehouseReceived:  model.WarehouseReceived,
-			PersonallyReceived: model.PersonallyReceived,
-			DispatchDate:       model.DispatchDate,
-			BatchMonth:         model.BatchMonth,
-			CreatedAt:          model.CreatedAt,
-			UpdatedAt:          model.UpdatedAt,
-		})
+		packages = append(packages, repository.toDomainShippingPackage(&model))
+	}
+	return packages, nil
+}
+
+func (repository *DebtRepository) FindPackagesByOrderNumber(ctx context.Context, orderNumber string) ([]*domain.ShippingPackage, error) {
+	var models []ShippingPackageModel
+	err := repository.db(ctx).Where("order_number = ?", orderNumber).Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	packages := make([]*domain.ShippingPackage, 0, len(models))
+	for _, model := range models {
+		packages = append(packages, repository.toDomainShippingPackage(&model))
 	}
 	return packages, nil
 }
 
 func (repository *DebtRepository) FindPackageByID(ctx context.Context, id string) (*domain.ShippingPackage, error) {
 	var model ShippingPackageModel
-	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).First(&model).Error
+	err := repository.db(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -381,24 +404,13 @@ func (repository *DebtRepository) FindPackageByID(ctx context.Context, id string
 		return nil, err
 	}
 
-	return &domain.ShippingPackage{
-		ID:                 model.ID,
-		OrderNumber:        model.OrderNumber,
-		TrackingNumber:     model.TrackingNumber,
-		ShippingCost:       model.ShippingCost,
-		ItemDescription:    model.ItemDescription,
-		WarehouseReceived:  model.WarehouseReceived,
-		PersonallyReceived: model.PersonallyReceived,
-		DispatchDate:       model.DispatchDate,
-		BatchMonth:         model.BatchMonth,
-		CreatedAt:          model.CreatedAt,
-		UpdatedAt:          model.UpdatedAt,
-	}, nil
+	return repository.toDomainShippingPackage(&model), nil
 }
 
 func (repository *DebtRepository) SavePackage(ctx context.Context, pkg *domain.ShippingPackage) error {
 	model := ShippingPackageModel{
 		ID:                 pkg.ID,
+		PurchaseItemID:     pkg.PurchaseItemID,
 		OrderNumber:        pkg.OrderNumber,
 		TrackingNumber:     pkg.TrackingNumber,
 		ShippingCost:       pkg.ShippingCost,
@@ -410,7 +422,11 @@ func (repository *DebtRepository) SavePackage(ctx context.Context, pkg *domain.S
 		CreatedAt:          pkg.CreatedAt,
 		UpdatedAt:          pkg.UpdatedAt,
 	}
-	return repository.databaseConnection.WithContext(ctx).Save(&model).Error
+	return repository.db(ctx).Save(&model).Error
+}
+
+func (repository *DebtRepository) DeletePackagesByPurchaseID(ctx context.Context, purchaseID string) error {
+	return repository.db(ctx).Where("purchase_item_id = ?", purchaseID).Delete(&ShippingPackageModel{}).Error
 }
 
 func (repository *DebtRepository) RecalculateAllBalances(ctx context.Context) error {
@@ -421,14 +437,14 @@ func (repository *DebtRepository) RecalculateAllBalances(ctx context.Context) er
 
 	for _, person := range persons {
 		var purchases []PurchaseItemModel
-		_ = repository.databaseConnection.WithContext(ctx).Where("person_id = ?", person.ID).Find(&purchases).Error
+		_ = repository.db(ctx).Where("person_id = ?", person.ID).Find(&purchases).Error
 		var totalOwed float64
 		for _, purchase := range purchases {
 			totalOwed += purchase.TotalCost
 		}
 
 		var payments []PaymentTransactionModel
-		_ = repository.databaseConnection.WithContext(ctx).Where("person_id = ?", person.ID).Find(&payments).Error
+		_ = repository.db(ctx).Where("person_id = ?", person.ID).Find(&payments).Error
 		var totalPaid float64
 		for _, payment := range payments {
 			totalPaid += payment.AmountPaid
@@ -443,9 +459,61 @@ func (repository *DebtRepository) RecalculateAllBalances(ctx context.Context) er
 }
 
 func (repository *DebtRepository) ResetAllData(ctx context.Context) error {
-	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM payment_transactions;").Error
-	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM purchase_items;").Error
-	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM shipping_packages;").Error
-	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM persons;").Error
+	_ = repository.db(ctx).Exec("DELETE FROM payment_transactions;").Error
+	_ = repository.db(ctx).Exec("DELETE FROM purchase_items;").Error
+	_ = repository.db(ctx).Exec("DELETE FROM shipping_packages;").Error
+	_ = repository.db(ctx).Exec("DELETE FROM persons;").Error
 	return nil
+}
+
+// EnsurePurchaseItemForeignKey backfills the Order<->Package link and creates the physical
+// FK constraint. AutoMigrate adds the columns and indexes declared on the models, but the
+// backfill and the constraint itself are applied here (mirroring migrations/000003).
+func (repository *DebtRepository) EnsurePurchaseItemForeignKey(ctx context.Context) error {
+	backfillSQL := `
+		UPDATE shipping_packages
+		SET purchase_item_id = best.purchase_item_id
+		FROM (
+			SELECT candidate.package_id,
+			       candidate.purchase_item_id,
+			       ROW_NUMBER() OVER (
+			           PARTITION BY candidate.package_id
+			           ORDER BY candidate.same_period DESC, candidate.purchase_item_id
+			       ) AS preference_rank,
+			       COUNT(*) FILTER (WHERE candidate.same_period) OVER (PARTITION BY candidate.package_id) AS same_period_count,
+			       COUNT(*) OVER (PARTITION BY candidate.package_id) AS total_count
+			FROM (
+				SELECT shipping_packages.id AS package_id,
+				       purchase_items.id AS purchase_item_id,
+				       (purchase_items.detail_period = shipping_packages.batch_month) AS same_period
+				FROM shipping_packages
+				JOIN purchase_items
+				  ON purchase_items.order_number = shipping_packages.order_number
+				 AND purchase_items.deleted_at IS NULL
+			) candidate
+		) best
+		WHERE shipping_packages.id = best.package_id
+		  AND best.preference_rank = 1
+		  AND (
+		      (best.same_period_count = 1 AND best.total_count >= 1)
+		      OR (best.same_period_count = 0 AND best.total_count = 1)
+		  )`
+	if err := repository.databaseConnection.WithContext(ctx).Exec(backfillSQL).Error; err != nil {
+		return err
+	}
+
+	fkSQL := `
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint WHERE conname = 'fk_shipping_packages_purchase_item'
+			) THEN
+				ALTER TABLE shipping_packages
+					ADD CONSTRAINT fk_shipping_packages_purchase_item
+					FOREIGN KEY (purchase_item_id)
+					REFERENCES purchase_items(id)
+					ON DELETE CASCADE;
+			END IF;
+		END $$;`
+	return repository.databaseConnection.WithContext(ctx).Exec(fkSQL).Error
 }
