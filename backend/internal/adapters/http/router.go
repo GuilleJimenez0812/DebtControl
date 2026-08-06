@@ -42,6 +42,8 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase) *
 			debtGroup.GET("/summary", debtHandler.GetDashboardSummary)
 			debtGroup.GET("/persons", debtHandler.ListPersons)
 			debtGroup.POST("/purchases", debtHandler.CreatePurchase)
+			debtGroup.PUT("/purchases/:id", debtHandler.UpdatePurchase)
+			debtGroup.PUT("/packages/:id", debtHandler.UpdatePackage)
 			debtGroup.POST("/payments", debtHandler.RecordPayment)
 			debtGroup.POST("/seed", debtHandler.SeedData)
 		}

@@ -98,11 +98,39 @@ func (repository *DebtRepository) FindAllPurchases(ctx context.Context) ([]*doma
 			ShippingCost: model.ShippingCost,
 			TotalCost:    model.TotalCost,
 			DetailPeriod: model.DetailPeriod,
+			InvoiceURL:   model.InvoiceURL,
 			CreatedAt:    model.CreatedAt,
 			UpdatedAt:    model.UpdatedAt,
 		}
 	}
 	return purchases, nil
+}
+
+func (repository *DebtRepository) FindPurchaseByID(ctx context.Context, id string) (*domain.PurchaseItem, error) {
+	var model PurchaseItemModel
+	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).First(&model).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &domain.PurchaseItem{
+		ID:           model.ID,
+		PersonID:     model.PersonID,
+		PersonName:   model.PersonName,
+		OrderNumber:  model.OrderNumber,
+		Description:  model.Description,
+		ItemAmount:   model.ItemAmount,
+		TaxAmount:    model.TaxAmount,
+		ShippingCost: model.ShippingCost,
+		TotalCost:    model.TotalCost,
+		DetailPeriod: model.DetailPeriod,
+		InvoiceURL:   model.InvoiceURL,
+		CreatedAt:    model.CreatedAt,
+		UpdatedAt:    model.UpdatedAt,
+	}, nil
 }
 
 func (repository *DebtRepository) SavePurchase(ctx context.Context, purchase *domain.PurchaseItem) error {
@@ -117,6 +145,7 @@ func (repository *DebtRepository) SavePurchase(ctx context.Context, purchase *do
 		ShippingCost: purchase.ShippingCost,
 		TotalCost:    purchase.TotalCost,
 		DetailPeriod: purchase.DetailPeriod,
+		InvoiceURL:   purchase.InvoiceURL,
 		CreatedAt:    purchase.CreatedAt,
 		UpdatedAt:    purchase.UpdatedAt,
 	}
@@ -168,31 +197,60 @@ func (repository *DebtRepository) FindAllPackages(ctx context.Context) ([]*domai
 	packages := make([]*domain.ShippingPackage, len(models))
 	for index, model := range models {
 		packages[index] = &domain.ShippingPackage{
-			ID:                model.ID,
-			OrderNumber:       model.OrderNumber,
-			TrackingNumber:    model.TrackingNumber,
-			ShippingCost:      model.ShippingCost,
-			ItemDescription:   model.ItemDescription,
-			WarehouseReceived: model.WarehouseReceived,
-			DispatchDate:      model.DispatchDate,
-			BatchMonth:        model.BatchMonth,
-			CreatedAt:         model.CreatedAt,
+			ID:                 model.ID,
+			OrderNumber:        model.OrderNumber,
+			TrackingNumber:     model.TrackingNumber,
+			ShippingCost:       model.ShippingCost,
+			ItemDescription:    model.ItemDescription,
+			WarehouseReceived:  model.WarehouseReceived,
+			PersonallyReceived: model.PersonallyReceived,
+			DispatchDate:       model.DispatchDate,
+			BatchMonth:         model.BatchMonth,
+			CreatedAt:          model.CreatedAt,
+			UpdatedAt:          model.UpdatedAt,
 		}
 	}
 	return packages, nil
 }
 
+func (repository *DebtRepository) FindPackageByID(ctx context.Context, id string) (*domain.ShippingPackage, error) {
+	var model ShippingPackageModel
+	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).First(&model).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &domain.ShippingPackage{
+		ID:                 model.ID,
+		OrderNumber:        model.OrderNumber,
+		TrackingNumber:     model.TrackingNumber,
+		ShippingCost:       model.ShippingCost,
+		ItemDescription:    model.ItemDescription,
+		WarehouseReceived:  model.WarehouseReceived,
+		PersonallyReceived: model.PersonallyReceived,
+		DispatchDate:       model.DispatchDate,
+		BatchMonth:         model.BatchMonth,
+		CreatedAt:          model.CreatedAt,
+		UpdatedAt:          model.UpdatedAt,
+	}, nil
+}
+
 func (repository *DebtRepository) SavePackage(ctx context.Context, pkg *domain.ShippingPackage) error {
 	model := ShippingPackageModel{
-		ID:                pkg.ID,
-		OrderNumber:       pkg.OrderNumber,
-		TrackingNumber:    pkg.TrackingNumber,
-		ShippingCost:      pkg.ShippingCost,
-		ItemDescription:   pkg.ItemDescription,
-		WarehouseReceived: pkg.WarehouseReceived,
-		DispatchDate:      pkg.DispatchDate,
-		BatchMonth:        pkg.BatchMonth,
-		CreatedAt:         pkg.CreatedAt,
+		ID:                 pkg.ID,
+		OrderNumber:        pkg.OrderNumber,
+		TrackingNumber:     pkg.TrackingNumber,
+		ShippingCost:       pkg.ShippingCost,
+		ItemDescription:    pkg.ItemDescription,
+		WarehouseReceived:  pkg.WarehouseReceived,
+		PersonallyReceived: pkg.PersonallyReceived,
+		DispatchDate:       pkg.DispatchDate,
+		BatchMonth:         pkg.BatchMonth,
+		CreatedAt:          pkg.CreatedAt,
+		UpdatedAt:          pkg.UpdatedAt,
 	}
 	return repository.databaseConnection.WithContext(ctx).Save(&model).Error
 }

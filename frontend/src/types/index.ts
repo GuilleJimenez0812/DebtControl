@@ -31,6 +31,7 @@ export interface PurchaseItem {
   shipping_cost: number;
   total_cost: number;
   detail_period: string;
+  invoice_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -50,9 +51,11 @@ export interface ShippingPackage {
   shipping_cost: number;
   item_description: string;
   warehouse_received: boolean;
+  personally_received: boolean;
   dispatch_date: string;
   batch_month: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface DashboardSummary {

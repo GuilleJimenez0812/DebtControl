@@ -21,6 +21,20 @@ type CreatePurchaseRequest struct {
 	DetailPeriod string  `json:"detail_period"`
 }
 
+type UpdatePurchaseRequest struct {
+	ItemAmount   float64 `json:"item_amount" binding:"gte=0"`
+	TaxAmount    float64 `json:"tax_amount" binding:"gte=0"`
+	ShippingCost float64 `json:"shipping_cost" binding:"gte=0"`
+	InvoiceURL   string  `json:"invoice_url"`
+}
+
+type UpdatePackageRequest struct {
+	ShippingCost       float64 `json:"shipping_cost" binding:"gte=0"`
+	WarehouseReceived  bool    `json:"warehouse_received"`
+	PersonallyReceived bool    `json:"personally_received"`
+	DispatchDate       string  `json:"dispatch_date"`
+}
+
 type RecordPaymentRequest struct {
 	PersonID   string  `json:"person_id" binding:"required"`
 	AmountPaid float64 `json:"amount_paid" binding:"gt=0"`

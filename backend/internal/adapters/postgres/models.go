@@ -44,6 +44,7 @@ type PurchaseItemModel struct {
 	ShippingCost float64   `gorm:"type:numeric(10,2);default:0"`
 	TotalCost    float64   `gorm:"type:numeric(10,2);default:0"`
 	DetailPeriod string    `gorm:"type:varchar(50)"`
+	InvoiceURL   string    `gorm:"type:text"`
 	CreatedAt    time.Time `gorm:"autoCreateTime"`
 	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
 }
@@ -65,15 +66,17 @@ func (PaymentTransactionModel) TableName() string {
 }
 
 type ShippingPackageModel struct {
-	ID                string    `gorm:"primaryKey;type:varchar(64)"`
-	OrderNumber       string    `gorm:"type:varchar(255)"`
-	TrackingNumber    string    `gorm:"type:varchar(255)"`
-	ShippingCost      float64   `gorm:"type:numeric(10,2);default:0"`
-	ItemDescription   string    `gorm:"type:text"`
-	WarehouseReceived bool      `gorm:"default:false"`
-	DispatchDate      string    `gorm:"type:varchar(100)"`
-	BatchMonth        string    `gorm:"type:varchar(50)"`
-	CreatedAt         time.Time `gorm:"autoCreateTime"`
+	ID                 string    `gorm:"primaryKey;type:varchar(64)"`
+	OrderNumber        string    `gorm:"type:varchar(255)"`
+	TrackingNumber     string    `gorm:"type:varchar(255)"`
+	ShippingCost       float64   `gorm:"type:numeric(10,2);default:0"`
+	ItemDescription    string    `gorm:"type:text"`
+	WarehouseReceived  bool      `gorm:"default:false"`
+	PersonallyReceived bool      `gorm:"default:false"`
+	DispatchDate       string    `gorm:"type:varchar(100)"`
+	BatchMonth         string    `gorm:"type:varchar(50)"`
+	CreatedAt          time.Time `gorm:"autoCreateTime"`
+	UpdatedAt          time.Time `gorm:"autoUpdateTime"`
 }
 
 func (ShippingPackageModel) TableName() string {

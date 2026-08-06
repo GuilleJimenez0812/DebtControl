@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,7 +7,7 @@ services:
       POSTGRES_PASSWORD: postgrespassword
       POSTGRES_DB: debtcontrol
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +20,7 @@ services:
     image: redis:7-alpine
     container_name: debtcontrol_redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -37,7 +35,7 @@ services:
       dockerfile: Dockerfile
     container_name: debtcontrol_api
     ports:
-      - "8080:8080"
+      - "8085:8080"
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_USER: postgres
@@ -53,6 +51,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: debtcontrol_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
 
 volumes:
   postgres_data:
