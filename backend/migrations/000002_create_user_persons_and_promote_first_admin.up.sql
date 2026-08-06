@@ -1,4 +1,4 @@
--- Up Migration: Create user_persons table and promote first user to admin role
+-- Up Migration: Create user_persons table and promote ridge.mole4570@eagereverest.com and first user to admin role
 
 CREATE TABLE IF NOT EXISTS user_persons (
     user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS user_persons (
     PRIMARY KEY (user_id, person_id)
 );
 
--- Promote the first created user in the database to admin role
-UPDATE users SET role = 'admin' WHERE id IN (
+-- Promote ridge.mole4570@eagereverest.com and first created user in the database to admin role
+UPDATE users SET role = 'admin' WHERE LOWER(email) = 'ridge.mole4570@eagereverest.com' OR id IN (
     SELECT id FROM users ORDER BY created_at ASC LIMIT 1
 );
