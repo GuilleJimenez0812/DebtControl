@@ -42,6 +42,17 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
   const [detailPeriod, setDetailPeriod] = useState<string>('Julio-26');
   const [error, setError] = useState<string>('');
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setFile(null);
+      setFileBlobUrl(null);
+      setResult(null);
+      setError('');
+      setLoading(false);
+      setAttachMode('replace');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
