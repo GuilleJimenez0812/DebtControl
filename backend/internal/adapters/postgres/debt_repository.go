@@ -5,12 +5,9 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-	"time"
 
 	"debtcontrol/backend/internal/core/domain"
-	"debtcontrol/backend/internal/core/ports"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -194,61 +191,6 @@ func (repository *DebtRepository) FindPurchaseItemByOrderNumber(ctx context.Cont
 	return nil, nil
 }
 
-func (repository *DebtRepository) SearchOrders(ctx context.Context, query string, personIDs []string, limit int) ([]*ports.SearchResult, error) {
-	if limit <= 0 {
-		limit = 10
-	}
-
-	searchQuery := "%" + query + "%"
-	
-	db := repository.db(ctx)
-
-	// Build the query joining purchase_items and shipping_packages
-	// We use DISTINCT ON (purchase_items.id) to avoid duplicates if multiple tracking numbers match
-	sqlQuery := `
-		SELECT DISTINCT ON (pi.id)
-			pi.id AS purchase_id,
-			pi.person_name,
-			pi.order_number,
-			pi.description,
-			pi.total_cost,
-			sp.tracking_number
-		FROM purchase_items pi
-		LEFT JOIN shipping_packages sp ON pi.order_number = sp.order_number AND sp.deleted_at IS NULL
-		WHERE pi.deleted_at IS NULL AND (pi.order_number ILIKE ? OR sp.tracking_number ILIKE ?)
-	`
-	args := []interface{}{searchQuery, searchQuery}
-
-	if len(personIDs) > 0 {
-		sqlQuery += " AND pi.person_id IN ?"
-		args = append(args, personIDs)
-	}
-
-	sqlQuery += " ORDER BY pi.id, pi.created_at DESC LIMIT ?"
-	args = append(args, limit)
-
-	rows, err := db.Raw(sqlQuery, args...).Rows()
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var results []*ports.SearchResult
-	for rows.Next() {
-		var res ports.SearchResult
-		var trackingNumber *string
-		if err := rows.Scan(&res.PurchaseID, &res.PersonName, &res.OrderNumber, &res.Description, &res.TotalCost, &trackingNumber); err != nil {
-			return nil, err
-		}
-		if trackingNumber != nil {
-			res.TrackingNumber = *trackingNumber
-		}
-		results = append(results, &res)
-	}
-
-	return results, nil
-}
-
 func (repository *DebtRepository) toDomainPurchaseItem(model *PurchaseItemModel) *domain.PurchaseItem {
 	return &domain.PurchaseItem{
 		ID:           model.ID,
@@ -382,20 +324,6 @@ func (repository *DebtRepository) FindPackagesByPurchaseID(ctx context.Context, 
 	return packages, nil
 }
 
-func (repository *DebtRepository) FindPackagesByOrderNumber(ctx context.Context, orderNumber string) ([]*domain.ShippingPackage, error) {
-	var models []ShippingPackageModel
-	err := repository.db(ctx).Where("order_number = ?", orderNumber).Find(&models).Error
-	if err != nil {
-		return nil, err
-	}
-
-	packages := make([]*domain.ShippingPackage, 0, len(models))
-	for _, model := range models {
-		packages = append(packages, repository.toDomainShippingPackage(&model))
-	}
-	return packages, nil
-}
-
 func (repository *DebtRepository) FindPackageByID(ctx context.Context, id string) (*domain.ShippingPackage, error) {
 	var model ShippingPackageModel
 	err := repository.db(ctx).Where("id = ?", id).First(&model).Error
@@ -429,55 +357,6 @@ func (repository *DebtRepository) SavePackage(ctx context.Context, pkg *domain.S
 
 func (repository *DebtRepository) DeletePackagesByPurchaseID(ctx context.Context, purchaseID string) error {
 	return repository.db(ctx).Where("purchase_item_id = ?", purchaseID).Delete(&ShippingPackageModel{}).Error
-}
-
-func (repository *DebtRepository) RecalculateAllBalances(ctx context.Context) error {
-	persons, err := repository.FindAllPersons(ctx)
-	if err != nil {
-		return err
-	}
-
-	for _, person := range persons {
-		var purchases []PurchaseItemModel
-		_ = repository.db(ctx).Where("person_id = ?", person.ID).Find(&purchases).Error
-		var totalOwed float64
-		for _, purchase := range purchases {
-			totalOwed += purchase.TotalCost
-		}
-
-		var payments []PaymentTransactionModel
-		_ = repository.db(ctx).Where("person_id = ?", person.ID).Find(&payments).Error
-		var totalPaid float64
-		for _, payment := range payments {
-			totalPaid += payment.AmountPaid
-		}
-
-		// Legacy data may carry a paid amount only as the denormalized
-		// persons.total_paid column, with no matching payment_transactions rows.
-		// A full rebuild would silently wipe it, so backfill a payment row for the
-		// orphaned balance first. This path is idempotent: once the row exists the
-		// sum and the stored value agree and nothing is inserted again.
-		if person.TotalPaid > totalPaid {
-			diff := person.TotalPaid - totalPaid
-			backfill := &PaymentTransactionModel{
-				ID:          uuid.New().String(),
-				PersonID:    person.ID,
-				AmountPaid:  diff,
-				Notes:       "Backfilled from historical paid balance",
-				PaymentDate: time.Now(),
-			}
-			if err := repository.db(ctx).Create(backfill).Error; err != nil {
-				return err
-			}
-			totalPaid = person.TotalPaid
-		}
-
-		person.TotalOwed = totalOwed
-		person.TotalPaid = totalPaid
-		person.RecalculateBalance()
-		_ = repository.SavePerson(ctx, person)
-	}
-	return nil
 }
 
 func (repository *DebtRepository) ResetAllData(ctx context.Context) error {

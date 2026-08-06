@@ -29,7 +29,7 @@ func TestUpdatePurchaseItem_DoesNotWipeOrphanedPersonPayments(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, repo.SavePurchase(context.Background(), order))
 
-	service := services.NewDebtService(repo, audit, &fakeUserRepository{})
+	service := services.NewDebtService(repo, audit, &fakeUserRepository{}, repo)
 
 	_, err = service.UpdatePurchaseItem(context.Background(), order.ID, order.ItemAmount, order.TaxAmount, order.ShippingCost, "")
 	require.NoError(t, err)

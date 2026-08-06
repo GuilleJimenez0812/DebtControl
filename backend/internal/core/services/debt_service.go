@@ -14,17 +14,84 @@ import (
 )
 
 type DebtService struct {
-	debtRepo  ports.DebtRepository
-	auditRepo ports.AuditRepository
-	userRepo  ports.UserRepository
+	debtRepo   ports.DebtRepository
+	auditRepo  ports.AuditRepository
+	userRepo   ports.UserRepository
+	searcher   ports.OrderSearcher
 }
 
-func NewDebtService(debtRepo ports.DebtRepository, auditRepo ports.AuditRepository, userRepo ports.UserRepository) *DebtService {
+func NewDebtService(debtRepo ports.DebtRepository, auditRepo ports.AuditRepository, userRepo ports.UserRepository, searcher ports.OrderSearcher) *DebtService {
 	return &DebtService{
 		debtRepo:  debtRepo,
 		auditRepo: auditRepo,
 		userRepo:  userRepo,
+		searcher:  searcher,
 	}
+}
+
+// RebalanceAllBalances recomputes every Person's derived balance from its
+// Orders and Payments. Public seam used by the restore CLI.
+func (service *DebtService) RebalanceAllBalances(ctx context.Context) error {
+	return service.rebuildBalances(ctx)
+}
+
+// rebuildBalances is the single seam that derives a Person's balance. Each
+// Order and Payment is read through the repository and the balance is
+// recomputed here, never written ad-hoc by individual use cases.
+func (service *DebtService) rebuildBalances(ctx context.Context) error {
+	persons, err := service.debtRepo.FindAllPersons(ctx)
+	if err != nil {
+		return err
+	}
+
+	allPurchases, err := service.debtRepo.FindAllPurchases(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, person := range persons {
+		var totalOwed float64
+		for _, purchase := range allPurchases {
+			if purchase.PersonID == person.ID {
+				totalOwed += purchase.TotalCost
+			}
+		}
+
+		payments, err := service.debtRepo.FindPaymentsByPersonID(ctx, person.ID)
+		if err != nil {
+			return err
+		}
+		var totalPaid float64
+		for _, payment := range payments {
+			totalPaid += payment.AmountPaid
+		}
+
+		// Legacy data may carry a paid amount only as the denormalized
+		// persons.total_paid column with no matching Payment rows. A full rebuild
+		// would silently wipe it, so backfill a Payment for the orphaned balance
+		// first. Idempotent: once the row exists the sum and the stored value agree.
+		if person.TotalPaid > totalPaid {
+			diff := person.TotalPaid - totalPaid
+			if err := service.debtRepo.SavePayment(ctx, &domain.PaymentTransaction{
+				ID:          uuid.New().String(),
+				PersonID:    person.ID,
+				AmountPaid:  diff,
+				Notes:       "Backfilled from historical paid balance",
+				PaymentDate: time.Now(),
+			}); err != nil {
+				return err
+			}
+			totalPaid = person.TotalPaid
+		}
+
+		person.TotalOwed = totalOwed
+		person.TotalPaid = totalPaid
+		person.RecalculateBalance()
+		if err := service.debtRepo.SavePerson(ctx, person); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (service *DebtService) ListPersonsForUser(ctx context.Context, user *domain.User) ([]*domain.Person, error) {
@@ -162,9 +229,9 @@ func (service *DebtService) CreatePurchaseItem(ctx context.Context, personName s
 		return nil, err
 	}
 
-	targetPerson.TotalOwed += newItem.TotalCost
-	targetPerson.RecalculateBalance()
-	_ = service.debtRepo.SavePerson(ctx, targetPerson)
+	if err := service.rebuildBalances(ctx); err != nil {
+		return nil, err
+	}
 
 	return newItem, nil
 }
@@ -190,17 +257,17 @@ func (service *DebtService) UpdatePurchaseItem(ctx context.Context, id string, i
 
 	service.logAudit(ctx, "UPDATE", "PurchaseItem", item.ID, "Updated purchase order "+item.OrderNumber)
 
-	_ = service.debtRepo.RecalculateAllBalances(ctx)
+	_ = service.rebuildBalances(ctx)
 	return item, nil
 }
 
-func (service *DebtService) syncPurchaseShippingCost(ctx context.Context, orderNumber string) error {
-	purchase, err := service.debtRepo.FindPurchaseItemByOrderNumber(ctx, orderNumber)
+func (service *DebtService) syncPurchaseShippingCost(ctx context.Context, purchaseID string) error {
+	purchase, err := service.debtRepo.FindPurchaseByID(ctx, purchaseID)
 	if err != nil || purchase == nil {
-		return nil // No purchase linked to this order number, nothing to sync
+		return nil // No purchase linked, nothing to sync
 	}
 
-	packages, err := service.debtRepo.FindPackagesByOrderNumber(ctx, orderNumber)
+	packages, err := service.debtRepo.FindPackagesByPurchaseID(ctx, purchaseID)
 	if err != nil {
 		return err
 	}
@@ -216,8 +283,7 @@ func (service *DebtService) syncPurchaseShippingCost(ctx context.Context, orderN
 	if err := service.debtRepo.SavePurchase(ctx, purchase); err != nil {
 		return err
 	}
-
-	_ = service.debtRepo.RecalculateAllBalances(ctx)
+	_ = service.rebuildBalances(ctx)
 	return nil
 }
 
@@ -240,7 +306,7 @@ func (service *DebtService) UpdateShippingPackage(ctx context.Context, id string
 
 	service.logAudit(ctx, "UPDATE", "ShippingPackage", pkg.ID, "Updated shipping package tracking: "+pkg.TrackingNumber)
 
-	_ = service.syncPurchaseShippingCost(ctx, pkg.OrderNumber)
+	_ = service.syncPurchaseShippingCost(ctx, pkg.PurchaseItemID)
 
 	return pkg, nil
 }
@@ -276,7 +342,7 @@ func (service *DebtService) CreateShippingPackage(ctx context.Context, purchaseI
 
 	service.logAudit(ctx, "CREATE", "ShippingPackage", pkg.ID, "Created shipping package tracking: "+pkg.TrackingNumber)
 
-	_ = service.syncPurchaseShippingCost(ctx, purchase.OrderNumber)
+	_ = service.syncPurchaseShippingCost(ctx, purchase.ID)
 
 	return pkg, nil
 }
@@ -317,7 +383,7 @@ func (service *DebtService) ReassignPurchaseToPerson(ctx context.Context, orderI
 		}
 
 		reassigned = item
-		return service.debtRepo.RecalculateAllBalances(txCtx)
+		return service.rebuildBalances(txCtx)
 	})
 	if err != nil {
 		return nil, err
@@ -345,7 +411,7 @@ func (service *DebtService) DeletePurchase(ctx context.Context, orderID string) 
 		service.logAudit(txCtx, "DELETE", "PurchaseItem", item.ID,
 			fmt.Sprintf("Deleted order %s - %s ($%.2f)", item.OrderNumber, item.Description, item.TotalCost))
 
-		return service.debtRepo.RecalculateAllBalances(txCtx)
+		return service.rebuildBalances(txCtx)
 	})
 }
 
@@ -374,10 +440,7 @@ func (service *DebtService) RecordPayment(ctx context.Context, personID string, 
 
 	service.logAudit(ctx, "CREATE", "PaymentTransaction", payment.ID, "Recorded payment for person: "+person.Name)
 
-	person.TotalPaid += amount
-	person.RecalculateBalance()
-	err = service.debtRepo.SavePerson(ctx, person)
-	if err != nil {
+	if err := service.rebuildBalances(ctx); err != nil {
 		return nil, err
 	}
 
@@ -596,7 +659,10 @@ func (service *DebtService) SearchOrders(ctx context.Context, query string, user
 		}
 	}
 
-	return service.debtRepo.SearchOrders(ctx, query, personIDs, limit)
+	if service.searcher == nil {
+		return []*ports.SearchResult{}, nil
+	}
+	return service.searcher.SearchOrders(ctx, query, personIDs, limit)
 }
 
 func (service *DebtService) logAudit(ctx context.Context, action string, entityType string, entityID string, details string) {

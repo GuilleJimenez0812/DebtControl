@@ -9,6 +9,7 @@ import (
 
 	"debtcontrol/backend/internal/adapters/postgres"
 	"debtcontrol/backend/internal/core/domain"
+	"debtcontrol/backend/internal/core/services"
 
 	"github.com/google/uuid"
 	gorm_postgres "gorm.io/driver/postgres"
@@ -92,7 +93,7 @@ func main() {
 		}
 	}
 
-	err = repo.RecalculateAllBalances(ctx)
+	err = services.NewDebtService(repo, nil, nil, nil).RebalanceAllBalances(ctx)
 	if err != nil {
 		log.Fatal("Failed to recalculate balances:", err)
 	}
