@@ -5,10 +5,12 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"time"
 
 	"debtcontrol/backend/internal/core/domain"
 	"debtcontrol/backend/internal/core/ports"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -448,6 +450,26 @@ func (repository *DebtRepository) RecalculateAllBalances(ctx context.Context) er
 		var totalPaid float64
 		for _, payment := range payments {
 			totalPaid += payment.AmountPaid
+		}
+
+		// Legacy data may carry a paid amount only as the denormalized
+		// persons.total_paid column, with no matching payment_transactions rows.
+		// A full rebuild would silently wipe it, so backfill a payment row for the
+		// orphaned balance first. This path is idempotent: once the row exists the
+		// sum and the stored value agree and nothing is inserted again.
+		if person.TotalPaid > totalPaid {
+			diff := person.TotalPaid - totalPaid
+			backfill := &PaymentTransactionModel{
+				ID:          uuid.New().String(),
+				PersonID:    person.ID,
+				AmountPaid:  diff,
+				Notes:       "Backfilled from historical paid balance",
+				PaymentDate: time.Now(),
+			}
+			if err := repository.db(ctx).Create(backfill).Error; err != nil {
+				return err
+			}
+			totalPaid = person.TotalPaid
 		}
 
 		person.TotalOwed = totalOwed

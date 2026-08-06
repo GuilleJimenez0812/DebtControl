@@ -191,6 +191,18 @@ func (fake *fakeDebtRepository) RecalculateAllBalances(_ context.Context) error 
 			}
 		}
 
+		// Mirror the real repository: backfill a payment row for a paid balance
+		// that only exists as the denormalized persons.total_paid column.
+		if person.TotalPaid > totalPaid {
+			diff := person.TotalPaid - totalPaid
+			fake.payments["backfill-"+person.ID] = &domain.PaymentTransaction{
+				ID:         "backfill-" + person.ID,
+				PersonID:   person.ID,
+				AmountPaid: diff,
+			}
+			totalPaid = person.TotalPaid
+		}
+
 		person.TotalOwed = totalOwed
 		person.TotalPaid = totalPaid
 		person.RecalculateBalance()
