@@ -223,7 +223,7 @@ func (handler *DebtHandler) ConfirmAttachInvoice(ginContext *gin.Context) {
 }
 
 func (handler *DebtHandler) SeedData(ginContext *gin.Context) {
-	err := handler.debtUseCase.SeedInitialSpreadsheetData(ginContext.Request.Context())
+	err := handler.debtUseCase.ResetAndSeedData(ginContext.Request.Context())
 	if err != nil {
 		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -95,4 +95,5 @@ type DebtUseCase interface {
 	ProcessInvoiceUpload(ctx context.Context, fileBytes []byte, filename string) (*ParseInvoiceResult, error)
 	ConfirmAttachInvoice(ctx context.Context, purchaseID string, invoiceFilename string, mode string) (*domain.PurchaseItem, error)
 	SeedInitialSpreadsheetData(ctx context.Context) error
+	ResetAndSeedData(ctx context.Context) error
 }

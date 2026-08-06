@@ -243,7 +243,19 @@ func (service *DebtService) RecordPayment(ctx context.Context, personID string, 
 }
 
 func (service *DebtService) SeedInitialSpreadsheetData(ctx context.Context) error {
+	existingPersons, err := service.debtRepo.FindAllPersons(ctx)
+	if err == nil && len(existingPersons) > 0 {
+		return nil // Already seeded! Do not wipe user modifications!
+	}
+	return service.forceSeedData(ctx)
+}
+
+func (service *DebtService) ResetAndSeedData(ctx context.Context) error {
 	_ = service.debtRepo.ResetAllData(ctx)
+	return service.forceSeedData(ctx)
+}
+
+func (service *DebtService) forceSeedData(ctx context.Context) error {
 
 	personMap := make(map[string]*domain.Person)
 
