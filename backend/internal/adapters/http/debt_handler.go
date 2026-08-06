@@ -161,6 +161,36 @@ func (handler *DebtHandler) RecordPayment(ginContext *gin.Context) {
 	})
 }
 
+func (handler *DebtHandler) UploadInvoice(ginContext *gin.Context) {
+	fileHeader, err := ginContext.FormFile("invoice_file")
+	if err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": "invoice_file form file required"})
+		return
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": "failed to open uploaded file"})
+		return
+	}
+	defer file.Close()
+
+	fileBytes := make([]byte, fileHeader.Size)
+	_, err = file.Read(fileBytes)
+	if err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": "failed to read uploaded file"})
+		return
+	}
+
+	result, err := handler.debtUseCase.ProcessInvoiceUpload(ginContext.Request.Context(), fileBytes, fileHeader.Filename)
+	if err != nil {
+		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, result)
+}
+
 func (handler *DebtHandler) SeedData(ginContext *gin.Context) {
 	err := handler.debtUseCase.SeedInitialSpreadsheetData(ginContext.Request.Context())
 	if err != nil {

@@ -133,6 +133,36 @@ func (repository *DebtRepository) FindPurchaseByID(ctx context.Context, id strin
 	}, nil
 }
 
+func (repository *DebtRepository) FindPurchaseItemByOrderNumber(ctx context.Context, orderNumber string) (*domain.PurchaseItem, error) {
+	if orderNumber == "" {
+		return nil, nil
+	}
+	var model PurchaseItemModel
+	err := repository.databaseConnection.WithContext(ctx).Where("order_number = ?", orderNumber).First(&model).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &domain.PurchaseItem{
+		ID:           model.ID,
+		PersonID:     model.PersonID,
+		PersonName:   model.PersonName,
+		OrderNumber:  model.OrderNumber,
+		Description:  model.Description,
+		ItemAmount:   model.ItemAmount,
+		TaxAmount:    model.TaxAmount,
+		ShippingCost: model.ShippingCost,
+		TotalCost:    model.TotalCost,
+		DetailPeriod: model.DetailPeriod,
+		InvoiceURL:   model.InvoiceURL,
+		CreatedAt:    model.CreatedAt,
+		UpdatedAt:    model.UpdatedAt,
+	}, nil
+}
+
 func (repository *DebtRepository) SavePurchase(ctx context.Context, purchase *domain.PurchaseItem) error {
 	model := PurchaseItemModel{
 		ID:           purchase.ID,

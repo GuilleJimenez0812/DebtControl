@@ -14,6 +14,7 @@ import { AuthWall } from './components/AuthWall';
 import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewPaymentModal } from './components/NewPaymentModal';
 import { AdminUserModal } from './components/AdminUserModal';
+import { UploadInvoiceModal } from './components/UploadInvoiceModal';
 import { Layers, ShoppingBag } from 'lucide-react';
 
 const queryClient = new QueryClient({
@@ -46,6 +47,7 @@ const DashboardContent: React.FC = () => {
 
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
+  const [isUploadInvoiceOpen, setIsUploadInvoiceOpen] = useState<boolean>(false);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState<boolean>(false);
   const [selectedPersonForPayment, setSelectedPersonForPayment] = useState<Person | null>(null);
   const [selectedPurchaseForModal, setSelectedPurchaseForModal] = useState<PurchaseItem | null>(null);
@@ -158,6 +160,7 @@ const DashboardContent: React.FC = () => {
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
         onOpenAuthModal={() => setIsAuthOpen(true)}
         onOpenAdminModal={() => setIsAdminOpen(true)}
+        onOpenUploadInvoiceModal={() => setIsUploadInvoiceOpen(true)}
         onLogout={handleLogout}
         onSeedData={() => seedMutation.mutate()}
         isSeeding={seedMutation.isPending}
@@ -254,6 +257,21 @@ const DashboardContent: React.FC = () => {
         }}
         onAssignPersons={async (userId, personIds) => {
           await assignUserPersonsMutation.mutateAsync({ userId, personIds });
+        }}
+      />
+
+      <UploadInvoiceModal
+        isOpen={isUploadInvoiceOpen}
+        persons={summary?.persons || []}
+        language={language}
+        onClose={() => setIsUploadInvoiceOpen(false)}
+        onUpload={async (file) => {
+          const res = await apiService.uploadInvoice(file);
+          queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
+          return res;
+        }}
+        onCreatePurchase={async (payload) => {
+          await purchaseMutation.mutateAsync(payload);
         }}
       />
 

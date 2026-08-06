@@ -2,7 +2,7 @@ import React from 'react';
 import type { User } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { CreditCard, LogIn, LogOut, ShieldCheck, Database, Globe, Sun, Moon, Users, Crown } from 'lucide-react';
+import { CreditCard, LogIn, LogOut, ShieldCheck, Database, Globe, Sun, Moon, Users, Crown, FileUp } from 'lucide-react';
 
 interface NavbarProps {
   user: User | null;
@@ -12,6 +12,7 @@ interface NavbarProps {
   onToggleTheme: () => void;
   onOpenAuthModal: () => void;
   onOpenAdminModal: () => void;
+  onOpenUploadInvoiceModal?: () => void;
   onLogout: () => void;
   onSeedData: () => void;
   isSeeding: boolean;
@@ -25,6 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
   onOpenAuthModal,
   onOpenAdminModal,
+  onOpenUploadInvoiceModal,
   onLogout,
   onSeedData,
   isSeeding,
@@ -86,6 +88,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Database className="w-3.5 h-3.5 text-indigo-400" />
               <span>{isSeeding ? t.seeding : t.seedData}</span>
+            </button>
+          )}
+
+          {/* Upload Invoice Button for Admin */}
+          {user && user.role === 'admin' && onOpenUploadInvoiceModal && (
+            <button
+              onClick={onOpenUploadInvoiceModal}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition"
+            >
+              <FileUp className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">{language === 'es' ? 'Subir Factura' : 'Upload Invoice'}</span>
             </button>
           )}
 

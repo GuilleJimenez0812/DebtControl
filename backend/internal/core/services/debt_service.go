@@ -7,6 +7,7 @@ import (
 
 	"debtcontrol/backend/internal/core/domain"
 	"debtcontrol/backend/internal/core/ports"
+	"debtcontrol/backend/pkg/pdf"
 
 	"github.com/google/uuid"
 )
@@ -370,4 +371,40 @@ func (service *DebtService) SeedInitialSpreadsheetData(ctx context.Context) erro
 	}
 
 	return nil
+}
+
+func (service *DebtService) ProcessInvoiceUpload(ctx context.Context, fileBytes []byte, filename string) (*ports.ParseInvoiceResult, error) {
+	parsedData := pdf.ParseInvoiceContent(fileBytes)
+
+	result := &ports.ParseInvoiceResult{
+		OrderNumber:  parsedData.OrderNumber,
+		Description:  parsedData.Description,
+		ItemAmount:   parsedData.ItemAmount,
+		TaxAmount:    parsedData.TaxAmount,
+		ShippingCost: parsedData.ShippingCost,
+		TotalCost:    parsedData.TotalCost,
+		Matched:      false,
+	}
+
+	if parsedData.OrderNumber != "" {
+		matchedItem, err := service.debtRepo.FindPurchaseItemByOrderNumber(ctx, parsedData.OrderNumber)
+		if err == nil && matchedItem != nil {
+			matchedItem.ItemAmount = parsedData.ItemAmount
+			matchedItem.TaxAmount = parsedData.TaxAmount
+			if parsedData.ShippingCost > 0 {
+				matchedItem.ShippingCost = parsedData.ShippingCost
+			}
+			matchedItem.InvoiceURL = filename
+			matchedItem.RecalculateTotalCost()
+
+			err = service.debtRepo.SavePurchase(ctx, matchedItem)
+			if err == nil {
+				_ = service.debtRepo.RecalculateAllBalances(ctx)
+				result.Matched = true
+				result.MatchedPurchaseItem = matchedItem
+			}
+		}
+	}
+
+	return result, nil
 }
