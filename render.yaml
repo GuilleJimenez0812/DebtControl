@@ -12,6 +12,8 @@ services:
         value: 8080
       - key: JWT_SECRET
         generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
       - key: POSTGRES_HOST
         fromDatabase:
           name: debtcontrol-db-dev
