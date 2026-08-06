@@ -63,6 +63,9 @@ func main() {
 	}
 	log.Println("Database migrations completed successfully.")
 
+	// Automatically promote the first created user in the database to admin role
+	_ = databaseConnection.Exec("UPDATE users SET role = 'admin' WHERE id IN (SELECT id FROM users ORDER BY created_at ASC LIMIT 1)").Error
+
 	var sessionRepository ports.SessionStore
 	redisHost := os.Getenv("REDIS_HOST")
 	redisEnabled := getEnvOrDefault("REDIS_ENABLED", "false")

@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"debtcontrol/backend/internal/core/domain"
@@ -44,18 +43,9 @@ func (service *AuthService) Register(ctx context.Context, email string, password
 	}
 
 	assignedRole := domain.RoleUser
-	lowerEmail := strings.ToLower(email)
-	lowerName := strings.ToLower(fullName)
-
-	// Automatically promote GuilleJimenez0812 / guillejimenez to Admin role
-	if strings.Contains(lowerEmail, "guillejimenez") || strings.Contains(lowerName, "guillejimenez") || strings.Contains(lowerEmail, "guillermo") {
-		assignedRole = domain.RoleAdmin
-	}
-
-	// Also promote first user if database has no users
 	allUsers, _ := service.userRepo.FindAll(ctx)
 	if len(allUsers) == 0 {
-		assignedRole = domain.RoleAdmin
+		assignedRole = domain.RoleAdmin // First user registered in DB is automatically Admin
 	}
 
 	userID := uuid.New().String()
@@ -81,14 +71,6 @@ func (service *AuthService) Login(ctx context.Context, email string, password st
 	err = security.ComparePassword(existingUser.PasswordHash, password)
 	if err != nil {
 		return "", "", nil, ErrInvalidCredentials
-	}
-
-	// Ensure GuilleJimenez0812 is always Admin role
-	lowerEmail := strings.ToLower(existingUser.Email)
-	lowerName := strings.ToLower(existingUser.FullName)
-	if (strings.Contains(lowerEmail, "guillejimenez") || strings.Contains(lowerName, "guillejimenez")) && existingUser.Role != domain.RoleAdmin {
-		existingUser.Role = domain.RoleAdmin
-		_ = service.userRepo.Create(ctx, existingUser)
 	}
 
 	accessToken, tokenID, err := security.GenerateAccessToken(existingUser.ID, existingUser.Email, string(existingUser.Role), service.jwtSecret, 15*time.Minute)
