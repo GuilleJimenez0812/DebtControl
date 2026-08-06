@@ -15,6 +15,7 @@ import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewPaymentModal } from './components/NewPaymentModal';
 import { AdminUserModal } from './components/AdminUserModal';
 import { UploadInvoiceModal } from './components/UploadInvoiceModal';
+import { InvoicePreviewModal } from './components/InvoicePreviewModal';
 import { Layers, ShoppingBag } from 'lucide-react';
 
 const queryClient = new QueryClient({
@@ -48,6 +49,7 @@ const DashboardContent: React.FC = () => {
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isUploadInvoiceOpen, setIsUploadInvoiceOpen] = useState<boolean>(false);
+  const [previewInvoiceUrl, setPreviewInvoiceUrl] = useState<string | null>(null);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState<boolean>(false);
   const [selectedPersonForPayment, setSelectedPersonForPayment] = useState<Person | null>(null);
   const [selectedPurchaseForModal, setSelectedPurchaseForModal] = useState<PurchaseItem | null>(null);
@@ -125,6 +127,14 @@ const DashboardContent: React.FC = () => {
       apiService.assignUserPersons(userId, personIds),
     onSuccess: () => {
       refetchAdminUsers();
+      queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+
+  const confirmAttachInvoiceMutation = useMutation({
+    mutationFn: ({ purchaseId, invoiceFilename, mode }: { purchaseId: string; invoiceFilename: string; mode: 'replace' | 'append' }) =>
+      apiService.confirmAttachInvoice(purchaseId, invoiceFilename, mode),
+    onSuccess: () => {
       queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
     },
   });
@@ -267,12 +277,22 @@ const DashboardContent: React.FC = () => {
         onClose={() => setIsUploadInvoiceOpen(false)}
         onUpload={async (file) => {
           const res = await apiService.uploadInvoice(file);
-          queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
           return res;
+        }}
+        onConfirmAttach={async (purchaseId, invoiceFilename, mode) => {
+          await confirmAttachInvoiceMutation.mutateAsync({ purchaseId, invoiceFilename, mode });
         }}
         onCreatePurchase={async (payload) => {
           await purchaseMutation.mutateAsync(payload);
         }}
+      />
+
+      <InvoicePreviewModal
+        isOpen={!!previewInvoiceUrl}
+        invoiceUrl={previewInvoiceUrl}
+        orderNumber={selectedPurchaseForModal?.order_number}
+        language={language}
+        onClose={() => setPreviewInvoiceUrl(null)}
       />
 
       <NewPurchaseModal
@@ -299,6 +319,7 @@ const DashboardContent: React.FC = () => {
         language={language}
         userRole={user?.role}
         onClose={() => setSelectedPurchaseForModal(null)}
+        onOpenPreviewInvoice={(url) => setPreviewInvoiceUrl(url)}
         onUpdatePurchase={async (id, payload) => {
           await updatePurchaseMutation.mutateAsync({ id, payload });
           setSelectedPurchaseForModal((prev) => (prev ? { ...prev, ...payload, total_cost: payload.item_amount + payload.tax_amount + payload.shipping_cost } : null));

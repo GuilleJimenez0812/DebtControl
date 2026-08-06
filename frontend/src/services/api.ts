@@ -86,6 +86,15 @@ export const apiService = {
     return response.data;
   },
 
+  confirmAttachInvoice: async (purchaseId: string, invoiceFilename: string, mode: 'replace' | 'append' = 'replace') => {
+    const response = await apiClient.post<{ purchase: PurchaseItem }>('/debts/purchases/confirm-invoice', {
+      purchase_id: purchaseId,
+      invoice_filename: invoiceFilename,
+      mode,
+    });
+    return response.data;
+  },
+
   updatePurchase: async (
     id: string,
     payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string }

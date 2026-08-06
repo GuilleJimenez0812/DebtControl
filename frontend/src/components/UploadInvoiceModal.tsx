@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import type { Person } from '../types';
+import type { Person, PurchaseItem } from '../types';
 import type { ParseInvoiceResult } from '../services/api';
 import type { Language } from '../i18n/translations';
-import { X, UploadCloud, AlertCircle, PlusCircle, CheckCircle2, User, Tag, FileText } from 'lucide-react';
+import { X, UploadCloud, AlertCircle, PlusCircle, CheckCircle2, User, Tag, FileText, Layers } from 'lucide-react';
 
 interface UploadInvoiceModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface UploadInvoiceModalProps {
   language: Language;
   onClose: () => void;
   onUpload: (file: File) => Promise<ParseInvoiceResult>;
+  onConfirmAttach: (purchaseId: string, invoiceFilename: string, mode: 'replace' | 'append') => Promise<void>;
   onCreatePurchase: (payload: {
     person_name: string;
     order_number: string;
@@ -27,11 +28,13 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
   language,
   onClose,
   onUpload,
+  onConfirmAttach,
   onCreatePurchase,
 }) => {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [result, setResult] = useState<ParseInvoiceResult | null>(null);
+  const [attachMode, setAttachMode] = useState<'replace' | 'append'>('replace');
   const [selectedPerson, setSelectedPerson] = useState<string>(persons[0]?.name || '');
   const [detailPeriod, setDetailPeriod] = useState<string>('Julio-26');
   const [error, setError] = useState<string>('');
@@ -57,6 +60,20 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
       setResult(res);
     } catch {
       setError(language === 'es' ? 'Error al analizar el PDF de la factura.' : 'Failed to parse invoice PDF.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAcceptMatch = async (item: PurchaseItem) => {
+    if (!file) return;
+    setLoading(true);
+    setError('');
+    try {
+      await onConfirmAttach(item.id, file.name, attachMode);
+      onClose();
+    } catch {
+      setError(language === 'es' ? 'Error al vincular la factura.' : 'Failed to attach invoice.');
     } finally {
       setLoading(false);
     }
@@ -133,33 +150,33 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
               disabled={!file || loading}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-sm font-bold text-white shadow-xl shadow-indigo-600/20 transition flex items-center justify-center space-x-2 disabled:opacity-50"
             >
-              <span>{loading ? (language === 'es' ? 'Analizando Factura...' : 'Parsing Invoice...') : (language === 'es' ? 'Buscar & Adjuntar Factura' : 'Match & Attach Invoice')}</span>
+              <span>{loading ? (language === 'es' ? 'Analizando Factura...' : 'Parsing Invoice...') : (language === 'es' ? 'Buscar & Coincidir Factura' : 'Match Invoice')}</span>
             </button>
           </form>
         ) : (
           <div className="space-y-6">
             {result.matched && result.matched_purchase_item ? (
-              <div className="glass-card p-6 rounded-2xl border-emerald-500/40 bg-emerald-950/10 space-y-4">
+              <div className="glass-card p-6 rounded-2xl border-emerald-500/40 bg-emerald-950/10 space-y-5">
                 <div className="flex items-center space-x-3 border-b border-emerald-500/20 pb-3">
                   <div className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <div>
                     <h4 className="text-base font-bold text-white">
-                      {language === 'es' ? '¡Factura Vinculada al Pedido!' : 'Invoice Attached to Order!'}
+                      {language === 'es' ? '¡Pedido Encontrado en el Sistema!' : 'Matching Order Found!'}
                     </h4>
                     <p className="text-xs text-emerald-300">
-                      {language === 'es' ? 'Factura adjunta sin modificar saldos ni montos' : 'PDF document attached without modifying payments or balances'}
+                      {language === 'es' ? 'Verifica los detalles del pedido antes de confirmar la vinculación' : 'Verify order details before confirming attachment'}
                     </p>
                   </div>
                 </div>
 
-                {/* Detailed Order Summary Card */}
-                <div className="space-y-2.5 text-xs bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+                {/* Detailed Order Match Summary */}
+                <div className="space-y-2.5 text-xs bg-slate-950/80 p-4 rounded-xl border border-slate-800">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 flex items-center space-x-1">
                       <User className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{language === 'es' ? 'Persona Asignada:' : 'Assigned Person:'}</span>
+                      <span>{language === 'es' ? 'Persona:' : 'Person:'}</span>
                     </span>
                     <span className="font-bold text-indigo-300">{result.matched_purchase_item.person_name}</span>
                   </div>
@@ -173,30 +190,82 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">{language === 'es' ? 'Descripción del Pedido:' : 'Description:'}</span>
+                    <span className="text-slate-400">{language === 'es' ? 'Descripción:' : 'Description:'}</span>
                     <span className="text-slate-200 font-medium truncate max-w-[220px]">{result.matched_purchase_item.description}</span>
                   </div>
 
                   <div className="flex items-center justify-between border-t border-slate-800 pt-2 mt-2">
-                    <span className="text-slate-400">{language === 'es' ? 'Monto Total del Pedido:' : 'Order Total:'}</span>
+                    <span className="text-slate-400">{language === 'es' ? 'Monto Total Actual del Pedido:' : 'Current Total:'}</span>
                     <span className="text-sm font-extrabold text-white font-mono">${result.matched_purchase_item.total_cost.toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center space-x-1">
-                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>{language === 'es' ? 'Archivo Adjunto:' : 'Attachment:'}</span>
-                    </span>
-                    <span className="text-emerald-400 font-semibold">{file?.name || 'Invoice PDF'}</span>
                   </div>
                 </div>
 
-                <button
-                  onClick={onClose}
-                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition"
-                >
-                  {language === 'es' ? 'Aceptar' : 'Done'}
-                </button>
+                {/* Check if invoice already attached */}
+                {result.matched_purchase_item.invoice_url ? (
+                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-3">
+                    <div className="flex items-center space-x-2 text-amber-400 text-xs font-semibold">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>
+                        {language === 'es' ? 'Esta orden ya tiene factura adjunta:' : 'This order already has an attached invoice:'}
+                      </span>
+                    </div>
+                    <p className="text-xs font-mono text-slate-300 truncate bg-slate-900 p-2 rounded-lg">
+                      {result.matched_purchase_item.invoice_url}
+                    </p>
+
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-bold text-slate-200">
+                        {language === 'es' ? '¿Cómo deseas manejar la nueva factura?' : 'How would you like to handle the new invoice?'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAttachMode('replace')}
+                          className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                            attachMode === 'replace'
+                              ? 'bg-amber-600 border-amber-500 text-white shadow-lg'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>{language === 'es' ? 'Reemplazar Existente' : 'Replace Existing'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setAttachMode('append')}
+                          className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
+                            attachMode === 'append'
+                              ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <Layers className="w-3.5 h-3.5" />
+                          <span>{language === 'es' ? 'Añadir Extra' : 'Add as Additional'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Confirm Action Button */}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setResult(null)}
+                    className="w-1/3 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                  >
+                    {language === 'es' ? 'Cancelar' : 'Cancel'}
+                  </button>
+
+                  <button
+                    onClick={() => handleAcceptMatch(result.matched_purchase_item!)}
+                    disabled={loading}
+                    className="w-2/3 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xl shadow-emerald-600/20 transition flex items-center justify-center space-x-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{loading ? 'Attaching...' : (language === 'es' ? 'Aceptar & Adjuntar Factura' : 'Accept & Attach Invoice')}</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="glass-card p-6 rounded-2xl border-amber-500/30 space-y-4">

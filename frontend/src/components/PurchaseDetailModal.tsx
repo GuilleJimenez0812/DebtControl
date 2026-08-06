@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { PurchaseItem, ShippingPackage } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { X, FileText, Edit2, Save, Package } from 'lucide-react';
+import { X, FileText, Edit2, Save, Package, Eye } from 'lucide-react';
 
 interface PurchaseDetailModalProps {
   purchase: PurchaseItem | null;
@@ -11,6 +11,7 @@ interface PurchaseDetailModalProps {
   language: Language;
   userRole?: string;
   onClose: () => void;
+  onOpenPreviewInvoice?: (url: string) => void;
   onUpdatePurchase: (id: string, payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string }) => Promise<void>;
   onUpdatePackage: (id: string, payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
 }
@@ -22,6 +23,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   language,
   userRole,
   onClose,
+  onOpenPreviewInvoice,
   onUpdatePurchase,
   onUpdatePackage,
 }) => {
@@ -45,6 +47,10 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const relatedPackages = packages.filter(
     (pkg) => pkg.order_number === purchase.order_number || (purchase.description && pkg.item_description && pkg.item_description.includes(purchase.description))
   );
+
+  const attachedInvoices = purchase.invoice_url
+    ? purchase.invoice_url.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
 
   const handleSavePurchase = async () => {
     await onUpdatePurchase(purchase.id, {
@@ -178,23 +184,34 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
             </div>
           )}
 
-          {/* Invoice PDF */}
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400 flex items-center space-x-1.5">
+          {/* Invoice PDF Section */}
+          <div className="mt-4 pt-3 border-t border-slate-800 space-y-2 text-xs">
+            <span className="text-slate-400 flex items-center space-x-1.5 font-semibold">
               <FileText className="w-4 h-4 text-indigo-400" />
               <span>{t.invoicePdf}</span>
             </span>
-            {purchase.invoice_url ? (
-              <a
-                href={purchase.invoice_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-indigo-400 hover:underline font-semibold"
-              >
-                View PDF Invoice ↗
-              </a>
+
+            {attachedInvoices.length === 0 ? (
+              <p className="text-slate-500 italic">{t.noInvoice}</p>
             ) : (
-              <span className="text-slate-500 italic">{t.noInvoice}</span>
+              <div className="space-y-1.5">
+                {attachedInvoices.map((invUrl, index) => (
+                  <div key={index} className="flex items-center justify-between bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                    <span className="font-mono text-slate-300 text-xs truncate max-w-[280px]">
+                      {invUrl}
+                    </span>
+                    {onOpenPreviewInvoice && (
+                      <button
+                        onClick={() => onOpenPreviewInvoice(invUrl)}
+                        className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>{language === 'es' ? 'Ver Factura' : 'View Invoice'}</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

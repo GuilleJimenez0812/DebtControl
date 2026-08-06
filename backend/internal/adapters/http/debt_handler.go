@@ -191,6 +191,37 @@ func (handler *DebtHandler) UploadInvoice(ginContext *gin.Context) {
 	ginContext.JSON(http.StatusOK, result)
 }
 
+type ConfirmAttachInvoiceRequest struct {
+	PurchaseID      string `json:"purchase_id" binding:"required"`
+	InvoiceFilename string `json:"invoice_filename" binding:"required"`
+	Mode            string `json:"mode"` // "replace" or "append"
+}
+
+func (handler *DebtHandler) ConfirmAttachInvoice(ginContext *gin.Context) {
+	var requestPayload ConfirmAttachInvoiceRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	purchase, err := handler.debtUseCase.ConfirmAttachInvoice(
+		ginContext.Request.Context(),
+		requestPayload.PurchaseID,
+		requestPayload.InvoiceFilename,
+		requestPayload.Mode,
+	)
+
+	if err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{
+		"message":  "invoice attached successfully",
+		"purchase": purchase,
+	})
+}
+
 func (handler *DebtHandler) SeedData(ginContext *gin.Context) {
 	err := handler.debtUseCase.SeedInitialSpreadsheetData(ginContext.Request.Context())
 	if err != nil {

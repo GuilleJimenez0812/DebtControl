@@ -386,15 +386,30 @@ func (service *DebtService) ProcessInvoiceUpload(ctx context.Context, fileBytes 
 	if parsedData.OrderNumber != "" {
 		matchedItem, err := service.debtRepo.FindPurchaseItemByOrderNumber(ctx, parsedData.OrderNumber)
 		if err == nil && matchedItem != nil {
-			// Attach invoice PDF URL ONLY, WITHOUT modifying any amounts or payments!
-			matchedItem.InvoiceURL = filename
-			err = service.debtRepo.SavePurchase(ctx, matchedItem)
-			if err == nil {
-				result.Matched = true
-				result.MatchedPurchaseItem = matchedItem
-			}
+			result.Matched = true
+			result.MatchedPurchaseItem = matchedItem
 		}
 	}
 
 	return result, nil
+}
+
+func (service *DebtService) ConfirmAttachInvoice(ctx context.Context, purchaseID string, invoiceFilename string, mode string) (*domain.PurchaseItem, error) {
+	item, err := service.debtRepo.FindPurchaseByID(ctx, purchaseID)
+	if err != nil || item == nil {
+		return nil, domain.ErrPurchaseItemNotFound
+	}
+
+	if mode == "append" && item.InvoiceURL != "" {
+		item.InvoiceURL = item.InvoiceURL + ", " + invoiceFilename
+	} else {
+		item.InvoiceURL = invoiceFilename
+	}
+
+	err = service.debtRepo.SavePurchase(ctx, item)
+	if err != nil {
+		return nil, err
+	}
+
+	return item, nil
 }
