@@ -14,6 +14,7 @@ import { AuthWall } from './components/AuthWall';
 import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewPaymentModal } from './components/NewPaymentModal';
 import { AdminUserModal } from './components/AdminUserModal';
+import { AuditLogsModal } from './components/AuditLogsModal';
 import { UploadInvoiceModal } from './components/UploadInvoiceModal';
 import { InvoicePreviewModal } from './components/InvoicePreviewModal';
 import { SearchBar } from './components/SearchBar';
@@ -49,6 +50,7 @@ const DashboardContent: React.FC = () => {
 
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
+  const [isAuditLogsOpen, setIsAuditLogsOpen] = useState<boolean>(false);
   const [isUploadInvoiceOpen, setIsUploadInvoiceOpen] = useState<boolean>(false);
   const [previewInvoiceUrl, setPreviewInvoiceUrl] = useState<string | null>(null);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState<boolean>(false);
@@ -188,6 +190,7 @@ const DashboardContent: React.FC = () => {
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
         onOpenAuthModal={() => setIsAuthOpen(true)}
         onOpenAdminModal={() => setIsAdminOpen(true)}
+        onOpenAuditLogsModal={() => setIsAuditLogsOpen(true)}
         onOpenUploadInvoiceModal={() => setIsUploadInvoiceOpen(true)}
         onLogout={handleLogout}
         onSeedData={() => seedMutation.mutate()}
@@ -288,6 +291,12 @@ const DashboardContent: React.FC = () => {
         onAssignPersons={async (userId, personIds) => {
           await assignUserPersonsMutation.mutateAsync({ userId, personIds });
         }}
+      />
+
+      <AuditLogsModal
+        isOpen={isAuditLogsOpen}
+        onClose={() => setIsAuditLogsOpen(false)}
+        language={language}
       />
 
       <UploadInvoiceModal

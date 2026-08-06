@@ -281,3 +281,17 @@ func (handler *DebtHandler) SearchOrders(ginContext *gin.Context) {
 
 	ginContext.JSON(http.StatusOK, gin.H{"results": results})
 }
+
+func (handler *DebtHandler) GetAuditLogs(ginContext *gin.Context) {
+	// Parse offset/limit if needed, using 50 by default
+	limit := 50
+	offset := 0
+
+	logs, err := handler.debtUseCase.GetAuditLogs(ginContext.Request.Context(), limit, offset)
+	if err != nil {
+		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"logs": logs})
+}

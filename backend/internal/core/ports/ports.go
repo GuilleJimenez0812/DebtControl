@@ -18,6 +18,11 @@ type UserRepository interface {
 	GetAssignedPersonIDs(ctx context.Context, userID string) ([]string, error)
 }
 
+type AuditRepository interface {
+	SaveAuditLog(ctx context.Context, log *domain.AuditLog) error
+	GetAuditLogs(ctx context.Context, limit int, offset int) ([]*domain.AuditLog, error)
+}
+
 type DebtRepository interface {
 	FindAllPersons(ctx context.Context) ([]*domain.Person, error)
 	FindPersonByID(ctx context.Context, id string) (*domain.Person, error)
@@ -110,4 +115,5 @@ type DebtUseCase interface {
 	SearchOrders(ctx context.Context, query string, user *domain.User, limit int) ([]*SearchResult, error)
 	SeedInitialSpreadsheetData(ctx context.Context) error
 	ResetAndSeedData(ctx context.Context) error
+	GetAuditLogs(ctx context.Context, limit int, offset int) ([]*domain.AuditLog, error)
 }

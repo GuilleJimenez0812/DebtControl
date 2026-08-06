@@ -13,14 +13,16 @@ import (
 )
 
 type DebtService struct {
-	debtRepo ports.DebtRepository
-	userRepo ports.UserRepository
+	debtRepo  ports.DebtRepository
+	auditRepo ports.AuditRepository
+	userRepo  ports.UserRepository
 }
 
-func NewDebtService(debtRepo ports.DebtRepository, userRepo ports.UserRepository) *DebtService {
+func NewDebtService(debtRepo ports.DebtRepository, auditRepo ports.AuditRepository, userRepo ports.UserRepository) *DebtService {
 	return &DebtService{
-		debtRepo: debtRepo,
-		userRepo: userRepo,
+		debtRepo:  debtRepo,
+		auditRepo: auditRepo,
+		userRepo:  userRepo,
 	}
 }
 
@@ -185,6 +187,8 @@ func (service *DebtService) UpdatePurchaseItem(ctx context.Context, id string, i
 		return nil, err
 	}
 
+	service.logAudit(ctx, "UPDATE", "PurchaseItem", item.ID, "Updated purchase order "+item.OrderNumber)
+
 	_ = service.debtRepo.RecalculateAllBalances(ctx)
 	return item, nil
 }
@@ -233,6 +237,8 @@ func (service *DebtService) UpdateShippingPackage(ctx context.Context, id string
 		return nil, err
 	}
 
+	service.logAudit(ctx, "UPDATE", "ShippingPackage", pkg.ID, "Updated shipping package tracking: "+pkg.TrackingNumber)
+
 	_ = service.syncPurchaseShippingCost(ctx, pkg.OrderNumber)
 
 	return pkg, nil
@@ -266,6 +272,8 @@ func (service *DebtService) CreateShippingPackage(ctx context.Context, purchaseI
 		return nil, err
 	}
 
+	service.logAudit(ctx, "CREATE", "ShippingPackage", pkg.ID, "Created shipping package tracking: "+pkg.TrackingNumber)
+
 	_ = service.syncPurchaseShippingCost(ctx, purchase.OrderNumber)
 
 	return pkg, nil
@@ -293,6 +301,8 @@ func (service *DebtService) RecordPayment(ctx context.Context, personID string, 
 	if err != nil {
 		return nil, err
 	}
+
+	service.logAudit(ctx, "CREATE", "PaymentTransaction", payment.ID, "Recorded payment for person: "+person.Name)
 
 	person.TotalPaid += amount
 	person.RecalculateBalance()
@@ -337,6 +347,17 @@ func (service *DebtService) forceSeedData(ctx context.Context) error {
 		person.TotalPaid = pData.TotalPaid
 		_ = service.debtRepo.SavePerson(ctx, person)
 		personMap[pData.Name] = person
+
+		if pData.TotalPaid > 0 {
+			payment := &domain.PaymentTransaction{
+				ID:          uuid.New().String(),
+				PersonID:    person.ID,
+				AmountPaid:  pData.TotalPaid,
+				Notes:       "Pago inicial",
+				PaymentDate: time.Now(),
+			}
+			_ = service.debtRepo.SavePayment(ctx, payment)
+		}
 	}
 
 	purchases := []struct {
@@ -503,4 +524,38 @@ func (service *DebtService) SearchOrders(ctx context.Context, query string, user
 	}
 
 	return service.debtRepo.SearchOrders(ctx, query, personIDs, limit)
+}
+
+func (service *DebtService) logAudit(ctx context.Context, action string, entityType string, entityID string, details string) {
+	if service.auditRepo == nil {
+		return
+	}
+	userObj := ctx.Value("user")
+	if userObj == nil {
+		return
+	}
+	user, ok := userObj.(*domain.User)
+	if !ok || user == nil {
+		return
+	}
+
+	auditLog := &domain.AuditLog{
+		ID:         uuid.New().String(),
+		UserID:     user.ID,
+		UserEmail:  user.Email,
+		Action:     action,
+		EntityType: entityType,
+		EntityID:   entityID,
+		Details:    details,
+		CreatedAt:  time.Now(),
+	}
+
+	_ = service.auditRepo.SaveAuditLog(ctx, auditLog)
+}
+
+func (service *DebtService) GetAuditLogs(ctx context.Context, limit int, offset int) ([]*domain.AuditLog, error) {
+	if service.auditRepo == nil {
+		return nil, nil
+	}
+	return service.auditRepo.GetAuditLogs(ctx, limit, offset)
 }

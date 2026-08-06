@@ -62,6 +62,7 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 			adminGroup.GET("/users", adminHandler.ListUsers)
 			adminGroup.POST("/users", adminHandler.CreateUser)
 			adminGroup.PUT("/users/:id/persons", adminHandler.AssignPersons)
+			adminGroup.GET("/audit-logs", debtHandler.GetAuditLogs)
 		}
 	}
 

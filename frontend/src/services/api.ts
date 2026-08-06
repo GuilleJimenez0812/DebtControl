@@ -144,4 +144,13 @@ export const apiService = {
     const response = await apiClient.put(`/admin/users/${userId}/persons`, { person_ids: personIds });
     return response.data;
   },
+
+  updateUserPerson: async (userId: string, personId: string): Promise<void> => {
+    await apiClient.put(`/admin/users/${userId}/person`, { person_id: personId });
+  },
+
+  getAuditLogs: async (limit: number = 50, offset: number = 0): Promise<{ logs: any[] }> => {
+    const response = await apiClient.get<{ logs: any[] }>(`/admin/audit-logs?limit=${limit}&offset=${offset}`);
+    return response.data;
+  },
 };
