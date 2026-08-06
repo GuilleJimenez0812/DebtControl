@@ -37,6 +37,7 @@ type DebtRepository interface {
 	SavePackage(ctx context.Context, pkg *domain.ShippingPackage) error
 
 	RecalculateAllBalances(ctx context.Context) error
+	ResetAllData(ctx context.Context) error
 }
 
 type SessionStore interface {

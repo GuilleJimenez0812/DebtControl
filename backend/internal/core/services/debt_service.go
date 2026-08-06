@@ -243,10 +243,7 @@ func (service *DebtService) RecordPayment(ctx context.Context, personID string, 
 }
 
 func (service *DebtService) SeedInitialSpreadsheetData(ctx context.Context) error {
-	existingPersons, err := service.debtRepo.FindAllPersons(ctx)
-	if err == nil && len(existingPersons) > 0 {
-		return nil // Already seeded
-	}
+	_ = service.debtRepo.ResetAllData(ctx)
 
 	personMap := make(map[string]*domain.Person)
 
@@ -389,17 +386,10 @@ func (service *DebtService) ProcessInvoiceUpload(ctx context.Context, fileBytes 
 	if parsedData.OrderNumber != "" {
 		matchedItem, err := service.debtRepo.FindPurchaseItemByOrderNumber(ctx, parsedData.OrderNumber)
 		if err == nil && matchedItem != nil {
-			matchedItem.ItemAmount = parsedData.ItemAmount
-			matchedItem.TaxAmount = parsedData.TaxAmount
-			if parsedData.ShippingCost > 0 {
-				matchedItem.ShippingCost = parsedData.ShippingCost
-			}
+			// Attach invoice PDF URL ONLY, WITHOUT modifying any amounts or payments!
 			matchedItem.InvoiceURL = filename
-			matchedItem.RecalculateTotalCost()
-
 			err = service.debtRepo.SavePurchase(ctx, matchedItem)
 			if err == nil {
-				_ = service.debtRepo.RecalculateAllBalances(ctx)
 				result.Matched = true
 				result.MatchedPurchaseItem = matchedItem
 			}

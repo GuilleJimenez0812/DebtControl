@@ -357,6 +357,13 @@ func (repository *DebtRepository) RecalculateAllBalances(ctx context.Context) er
 		person.RecalculateBalance()
 		_ = repository.SavePerson(ctx, person)
 	}
+	return nil
+}
 
+func (repository *DebtRepository) ResetAllData(ctx context.Context) error {
+	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM payment_transactions;").Error
+	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM purchase_items;").Error
+	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM shipping_packages;").Error
+	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM persons;").Error
 	return nil
 }
