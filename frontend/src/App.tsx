@@ -301,6 +301,7 @@ const DashboardContent: React.FC = () => {
         language={language}
         persons={summary?.persons || []}
         onClose={() => setIsPurchaseOpen(false)}
+        onUploadInvoice={apiService.uploadInvoice}
         onSubmit={async (payload) => {
           await purchaseMutation.mutateAsync(payload);
         }}

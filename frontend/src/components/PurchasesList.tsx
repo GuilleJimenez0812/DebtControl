@@ -92,7 +92,7 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
           <thead>
             <tr className="border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
               <th className="py-3 px-4">{t.person}</th>
-              <th className="py-3 px-4">Order / Item</th>
+              <th className="py-3 px-4">Order # / Item</th>
               <th className="py-3 px-4">{t.itemAmount}</th>
               <th className="py-3 px-4">{t.taxAmount}</th>
               <th className="py-3 px-4">{t.shippingCost}</th>
@@ -112,9 +112,11 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                   {item.person_name}
                 </td>
                 <td className="py-3.5 px-4 text-slate-200 font-medium">
-                  <div className="group-hover:text-indigo-300 transition">{item.description}</div>
-                  {item.order_number && (
-                    <div className="text-xs text-slate-500 font-mono">{item.order_number}</div>
+                  <div className="font-mono font-bold text-white group-hover:text-indigo-300 transition">
+                    {item.order_number || item.description}
+                  </div>
+                  {item.description && item.description !== item.order_number && (
+                    <div className="text-xs text-slate-400 font-sans mt-0.5">{item.description}</div>
                   )}
                 </td>
                 <td className="py-3.5 px-4 font-mono text-slate-300">
