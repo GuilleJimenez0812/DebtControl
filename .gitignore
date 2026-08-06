@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+backend/vendor/
+
+# Build outputs
+dist/
+build/
+backend/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Environment variables
+.env
+.env.*
+*.env
+!.env.example
+
+# IDEs and OS
+.DS_Store
+.vscode/
+.idea/
