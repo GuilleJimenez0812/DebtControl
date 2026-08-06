@@ -23,6 +23,10 @@ type AuditRepository interface {
 	GetAuditLogs(ctx context.Context, limit int, offset int) ([]*domain.AuditLog, error)
 }
 
+type OrderSearcher interface {
+	SearchOrders(ctx context.Context, query string, personIDs []string, limit int) ([]*SearchResult, error)
+}
+
 type DebtRepository interface {
 	FindAllPersons(ctx context.Context) ([]*domain.Person, error)
 	FindPersonByID(ctx context.Context, id string) (*domain.Person, error)
@@ -38,15 +42,11 @@ type DebtRepository interface {
 	SavePayment(ctx context.Context, payment *domain.PaymentTransaction) error
 
 	FindAllPackages(ctx context.Context) ([]*domain.ShippingPackage, error)
-	FindPackagesByOrderNumber(ctx context.Context, orderNumber string) ([]*domain.ShippingPackage, error)
 	FindPackagesByPurchaseID(ctx context.Context, purchaseID string) ([]*domain.ShippingPackage, error)
 	FindPackageByID(ctx context.Context, id string) (*domain.ShippingPackage, error)
 	SavePackage(ctx context.Context, pkg *domain.ShippingPackage) error
 	DeletePackagesByPurchaseID(ctx context.Context, purchaseID string) error
 
-	SearchOrders(ctx context.Context, query string, personIDs []string, limit int) ([]*SearchResult, error)
-
-	RecalculateAllBalances(ctx context.Context) error
 	ResetAllData(ctx context.Context) error
 	RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
