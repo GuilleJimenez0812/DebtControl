@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail } from 'lucide-react';
+import { X, Lock, Mail, User } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -12,9 +12,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   onLogin,
+  onRegister,
 }) => {
+  const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [fullName, setFullName] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -26,7 +29,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
 
     try {
-      await onLogin(email, password);
+      if (isRegisterMode) {
+        await onRegister(email, password, fullName);
+      } else {
+        await onLogin(email, password);
+      }
       onClose();
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -50,10 +57,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </button>
 
         <h3 className="text-xl font-bold text-white mb-2">
-          Sign In to DebtControl
+          {isRegisterMode ? 'Create DebtControl Account' : 'Sign In to DebtControl'}
         </h3>
         <p className="text-xs text-slate-400 mb-6">
-          Access debt control dashboard and record transactions
+          {isRegisterMode
+            ? 'Enter details to register a new user account'
+            : 'Access debt control dashboard and record transactions'}
         </p>
 
         {error && (
@@ -63,6 +72,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isRegisterMode && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name</label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Guillermo Jimenez"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
             <div className="relative">
@@ -99,12 +125,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             disabled={loading}
             className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 font-semibold text-white text-sm shadow-lg shadow-indigo-600/20 transition disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Sign In'}
+            {loading
+              ? 'Processing...'
+              : isRegisterMode
+              ? 'Register Account'
+              : 'Sign In'}
           </button>
         </form>
 
-        <div className="mt-4 p-2 bg-slate-900/60 rounded-xl text-center text-xs text-slate-500 border border-slate-800">
-          User registration is currently disabled by administrator.
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => {
+              setIsRegisterMode(!isRegisterMode);
+              setError('');
+            }}
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition"
+          >
+            {isRegisterMode
+              ? 'Already have an account? Sign In'
+              : "Don't have an account? Register"}
+          </button>
         </div>
       </div>
     </div>

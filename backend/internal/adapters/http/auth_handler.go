@@ -20,8 +20,27 @@ func NewAuthHandler(authUseCase ports.AuthUseCase) *AuthHandler {
 }
 
 func (handler *AuthHandler) Register(ginContext *gin.Context) {
-	ginContext.JSON(http.StatusForbidden, gin.H{
-		"error": "user registration is currently disabled by administrator",
+	var requestPayload RegisterRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := handler.authUseCase.Register(
+		ginContext.Request.Context(),
+		requestPayload.Email,
+		requestPayload.Password,
+		requestPayload.FullName,
+	)
+
+	if err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusCreated, gin.H{
+		"message": "user registered successfully",
+		"user":    user,
 	})
 }
 
