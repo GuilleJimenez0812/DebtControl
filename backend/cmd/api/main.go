@@ -9,6 +9,7 @@ import (
 	httpAdapter "debtcontrol/backend/internal/adapters/http"
 	postgresAdapter "debtcontrol/backend/internal/adapters/postgres"
 	redisAdapter "debtcontrol/backend/internal/adapters/redis"
+	"debtcontrol/backend/internal/core/ports"
 	"debtcontrol/backend/internal/core/services"
 
 	"github.com/redis/go-redis/v9"
@@ -27,19 +28,25 @@ func getEnvOrDefault(envKey string, defaultValue string) string {
 func main() {
 	log.Println("Starting DebtControl Backend API...")
 
-	postgresHost := getEnvOrDefault("POSTGRES_HOST", "localhost")
-	postgresUser := getEnvOrDefault("POSTGRES_USER", "postgres")
-	postgresPassword := getEnvOrDefault("POSTGRES_PASSWORD", "postgres")
-	postgresDB := getEnvOrDefault("POSTGRES_DB", "debtcontrol")
-	postgresPort := getEnvOrDefault("POSTGRES_PORT", "5432")
+	databaseURL := os.Getenv("DATABASE_URL")
+	var dsn string
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		postgresHost, postgresUser, postgresPassword, postgresDB, postgresPort)
+	if databaseURL != "" {
+		dsn = databaseURL
+	} else {
+		postgresHost := getEnvOrDefault("POSTGRES_HOST", "localhost")
+		postgresUser := getEnvOrDefault("POSTGRES_USER", "postgres")
+		postgresPassword := getEnvOrDefault("POSTGRES_PASSWORD", "postgrespassword")
+		postgresDB := getEnvOrDefault("POSTGRES_DB", "debtcontrol")
+		postgresPort := getEnvOrDefault("POSTGRES_PORT", "5432")
+		postgresSSLMode := getEnvOrDefault("POSTGRES_SSLMODE", "disable")
+
+		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
+			postgresHost, postgresUser, postgresPassword, postgresDB, postgresPort, postgresSSLMode)
+	}
 
 	databaseConnection, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Printf("Warning: Failed to connect to Postgres (%v). Falling back to local SQLite memory database for local execution.", err)
-		// SQLite driver import fallback can be used if needed
 		log.Fatalf("Database connection failure: %v", err)
 	}
 
@@ -55,15 +62,25 @@ func main() {
 	}
 	log.Println("Database migrations completed successfully.")
 
-	redisHost := getEnvOrDefault("REDIS_HOST", "localhost")
-	redisPort := getEnvOrDefault("REDIS_PORT", "6379")
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
-	})
+	// Session store setup (Redis or Memory fallback)
+	var sessionRepository ports.SessionStore
+	redisHost := os.Getenv("REDIS_HOST")
+	redisEnabled := getEnvOrDefault("REDIS_ENABLED", "false")
+
+	if redisEnabled == "true" && redisHost != "" {
+		redisPort := getEnvOrDefault("REDIS_PORT", "6379")
+		redisClient := redis.NewClient(&redis.Options{
+			Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
+		})
+		sessionRepository = redisAdapter.NewSessionRepository(redisClient)
+		log.Println("Redis session store connected.")
+	} else {
+		sessionRepository = redisAdapter.NewMemorySessionRepository()
+		log.Println("Redis is disabled. Using in-memory session store fallback.")
+	}
 
 	userRepository := postgresAdapter.NewUserRepository(databaseConnection)
 	debtRepository := postgresAdapter.NewDebtRepository(databaseConnection)
-	sessionRepository := redisAdapter.NewSessionRepository(redisClient)
 
 	jwtSecret := getEnvOrDefault("JWT_SECRET", "super-secret-debtcontrol-jwt-key-2026")
 	authService := services.NewAuthService(userRepository, sessionRepository, jwtSecret)
