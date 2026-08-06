@@ -13,14 +13,16 @@ import (
 )
 
 type DebtService struct {
-	debtRepo ports.DebtRepository
-	userRepo ports.UserRepository
+	debtRepo  ports.DebtRepository
+	auditRepo ports.AuditRepository
+	userRepo  ports.UserRepository
 }
 
-func NewDebtService(debtRepo ports.DebtRepository, userRepo ports.UserRepository) *DebtService {
+func NewDebtService(debtRepo ports.DebtRepository, auditRepo ports.AuditRepository, userRepo ports.UserRepository) *DebtService {
 	return &DebtService{
-		debtRepo: debtRepo,
-		userRepo: userRepo,
+		debtRepo:  debtRepo,
+		auditRepo: auditRepo,
+		userRepo:  userRepo,
 	}
 }
 
@@ -185,8 +187,37 @@ func (service *DebtService) UpdatePurchaseItem(ctx context.Context, id string, i
 		return nil, err
 	}
 
+	service.logAudit(ctx, "UPDATE", "PurchaseItem", item.ID, "Updated purchase order "+item.OrderNumber)
+
 	_ = service.debtRepo.RecalculateAllBalances(ctx)
 	return item, nil
+}
+
+func (service *DebtService) syncPurchaseShippingCost(ctx context.Context, orderNumber string) error {
+	purchase, err := service.debtRepo.FindPurchaseItemByOrderNumber(ctx, orderNumber)
+	if err != nil || purchase == nil {
+		return nil // No purchase linked to this order number, nothing to sync
+	}
+
+	packages, err := service.debtRepo.FindPackagesByOrderNumber(ctx, orderNumber)
+	if err != nil {
+		return err
+	}
+
+	var totalShipping float64
+	for _, pkg := range packages {
+		totalShipping += pkg.ShippingCost
+	}
+
+	purchase.ShippingCost = totalShipping
+	purchase.RecalculateTotalCost()
+
+	if err := service.debtRepo.SavePurchase(ctx, purchase); err != nil {
+		return err
+	}
+
+	_ = service.debtRepo.RecalculateAllBalances(ctx)
+	return nil
 }
 
 func (service *DebtService) UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error) {
@@ -205,6 +236,45 @@ func (service *DebtService) UpdateShippingPackage(ctx context.Context, id string
 	if err != nil {
 		return nil, err
 	}
+
+	service.logAudit(ctx, "UPDATE", "ShippingPackage", pkg.ID, "Updated shipping package tracking: "+pkg.TrackingNumber)
+
+	_ = service.syncPurchaseShippingCost(ctx, pkg.OrderNumber)
+
+	return pkg, nil
+}
+
+func (service *DebtService) CreateShippingPackage(ctx context.Context, purchaseID string, trackingNumber string, shippingCost float64) (*domain.ShippingPackage, error) {
+	purchase, err := service.debtRepo.FindPurchaseByID(ctx, purchaseID)
+	if err != nil {
+		return nil, err
+	}
+	if purchase == nil {
+		return nil, domain.ErrPurchaseItemNotFound
+	}
+
+	pkg := &domain.ShippingPackage{
+		ID:                 uuid.New().String(),
+		OrderNumber:        purchase.OrderNumber,
+		TrackingNumber:     trackingNumber,
+		ShippingCost:       shippingCost,
+		ItemDescription:    "",
+		WarehouseReceived:  false,
+		PersonallyReceived: false,
+		DispatchDate:       "",
+		BatchMonth:         "",
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+
+	err = service.debtRepo.SavePackage(ctx, pkg)
+	if err != nil {
+		return nil, err
+	}
+
+	service.logAudit(ctx, "CREATE", "ShippingPackage", pkg.ID, "Created shipping package tracking: "+pkg.TrackingNumber)
+
+	_ = service.syncPurchaseShippingCost(ctx, purchase.OrderNumber)
 
 	return pkg, nil
 }
@@ -231,6 +301,8 @@ func (service *DebtService) RecordPayment(ctx context.Context, personID string, 
 	if err != nil {
 		return nil, err
 	}
+
+	service.logAudit(ctx, "CREATE", "PaymentTransaction", payment.ID, "Recorded payment for person: "+person.Name)
 
 	person.TotalPaid += amount
 	person.RecalculateBalance()
@@ -275,6 +347,17 @@ func (service *DebtService) forceSeedData(ctx context.Context) error {
 		person.TotalPaid = pData.TotalPaid
 		_ = service.debtRepo.SavePerson(ctx, person)
 		personMap[pData.Name] = person
+
+		if pData.TotalPaid > 0 {
+			payment := &domain.PaymentTransaction{
+				ID:          uuid.New().String(),
+				PersonID:    person.ID,
+				AmountPaid:  pData.TotalPaid,
+				Notes:       "Pago inicial",
+				PaymentDate: time.Now(),
+			}
+			_ = service.debtRepo.SavePayment(ctx, payment)
+		}
 	}
 
 	purchases := []struct {
@@ -424,4 +507,55 @@ func (service *DebtService) ConfirmAttachInvoice(ctx context.Context, purchaseID
 	}
 
 	return item, nil
+}
+
+func (service *DebtService) SearchOrders(ctx context.Context, query string, user *domain.User, limit int) ([]*ports.SearchResult, error) {
+	var personIDs []string
+	if user.Role != domain.RoleAdmin {
+		var err error
+		personIDs, err = service.userRepo.GetAssignedPersonIDs(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		// If a standard user has no assigned persons, they shouldn't see any results
+		if len(personIDs) == 0 {
+			return []*ports.SearchResult{}, nil
+		}
+	}
+
+	return service.debtRepo.SearchOrders(ctx, query, personIDs, limit)
+}
+
+func (service *DebtService) logAudit(ctx context.Context, action string, entityType string, entityID string, details string) {
+	if service.auditRepo == nil {
+		return
+	}
+	userObj := ctx.Value("user")
+	if userObj == nil {
+		return
+	}
+	user, ok := userObj.(*domain.User)
+	if !ok || user == nil {
+		return
+	}
+
+	auditLog := &domain.AuditLog{
+		ID:         uuid.New().String(),
+		UserID:     user.ID,
+		UserEmail:  user.Email,
+		Action:     action,
+		EntityType: entityType,
+		EntityID:   entityID,
+		Details:    details,
+		CreatedAt:  time.Now(),
+	}
+
+	_ = service.auditRepo.SaveAuditLog(ctx, auditLog)
+}
+
+func (service *DebtService) GetAuditLogs(ctx context.Context, limit int, offset int) ([]*domain.AuditLog, error) {
+	if service.auditRepo == nil {
+		return nil, nil
+	}
+	return service.auditRepo.GetAuditLogs(ctx, limit, offset)
 }

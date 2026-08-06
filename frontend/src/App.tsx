@@ -14,8 +14,10 @@ import { AuthWall } from './components/AuthWall';
 import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewPaymentModal } from './components/NewPaymentModal';
 import { AdminUserModal } from './components/AdminUserModal';
+import { AuditLogsModal } from './components/AuditLogsModal';
 import { UploadInvoiceModal } from './components/UploadInvoiceModal';
 import { InvoicePreviewModal } from './components/InvoicePreviewModal';
+import { SearchBar } from './components/SearchBar';
 import { Layers, ShoppingBag } from 'lucide-react';
 
 const queryClient = new QueryClient({
@@ -48,6 +50,7 @@ const DashboardContent: React.FC = () => {
 
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
+  const [isAuditLogsOpen, setIsAuditLogsOpen] = useState<boolean>(false);
   const [isUploadInvoiceOpen, setIsUploadInvoiceOpen] = useState<boolean>(false);
   const [previewInvoiceUrl, setPreviewInvoiceUrl] = useState<string | null>(null);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState<boolean>(false);
@@ -100,6 +103,14 @@ const DashboardContent: React.FC = () => {
     },
   });
 
+  const createPackageMutation = useMutation({
+    mutationFn: ({ purchaseId, trackingNumber, shippingCost }: { purchaseId: string; trackingNumber: string; shippingCost: number }) =>
+      apiService.createPackage(purchaseId, trackingNumber, shippingCost),
+    onSuccess: () => {
+      queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+
   const updatePackageMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string } }) =>
       apiService.updatePackage(id, payload),
@@ -139,6 +150,15 @@ const DashboardContent: React.FC = () => {
     },
   });
 
+  const handleSearchResultSelect = (purchaseId: string) => {
+    if (summary && summary.recent_purchases) {
+      const purchase = summary.recent_purchases.find(p => p.id === purchaseId);
+      if (purchase) {
+        setSelectedPurchaseForModal(purchase);
+      }
+    }
+  };
+
   const handleLogin = async (email: string, pass: string) => {
     const result = await apiService.login(email, pass);
     setUser(result.user);
@@ -170,6 +190,7 @@ const DashboardContent: React.FC = () => {
         onToggleTheme={() => setIsDarkMode(!isDarkMode)}
         onOpenAuthModal={() => setIsAuthOpen(true)}
         onOpenAdminModal={() => setIsAdminOpen(true)}
+        onOpenAuditLogsModal={() => setIsAuditLogsOpen(true)}
         onOpenUploadInvoiceModal={() => setIsUploadInvoiceOpen(true)}
         onLogout={handleLogout}
         onSeedData={() => seedMutation.mutate()}
@@ -189,8 +210,10 @@ const DashboardContent: React.FC = () => {
               onSelectPersonFilter={handleSelectPersonFromSummary}
             />
 
+            <SearchBar language={language} onSelectResult={handleSearchResultSelect} />
+
             {/* View Tabs */}
-            <div className="flex space-x-2 border-b border-slate-800/80 mb-6 pb-2">
+            <div className="flex space-x-2 border-b border-slate-800/80 mb-6 pb-2 mt-2">
               <button
                 onClick={() => setActiveTab('debts')}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition ${
@@ -270,6 +293,12 @@ const DashboardContent: React.FC = () => {
         }}
       />
 
+      <AuditLogsModal
+        isOpen={isAuditLogsOpen}
+        onClose={() => setIsAuditLogsOpen(false)}
+        language={language}
+      />
+
       <UploadInvoiceModal
         isOpen={isUploadInvoiceOpen}
         persons={summary?.persons || []}
@@ -330,6 +359,9 @@ const DashboardContent: React.FC = () => {
         }}
         onUpdatePackage={async (id, payload) => {
           await updatePackageMutation.mutateAsync({ id, payload });
+        }}
+        onCreatePackage={async (purchaseId, trackingNumber, shippingCost) => {
+          await createPackageMutation.mutateAsync({ purchaseId, trackingNumber, shippingCost });
         }}
       />
     </div>

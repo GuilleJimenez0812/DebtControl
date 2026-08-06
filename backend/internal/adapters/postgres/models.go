@@ -92,3 +92,18 @@ type ShippingPackageModel struct {
 func (ShippingPackageModel) TableName() string {
 	return "shipping_packages"
 }
+
+type AuditLogModel struct {
+	ID         string    `gorm:"primaryKey;type:varchar(64)"`
+	UserID     string    `gorm:"index;type:varchar(64)"`
+	UserEmail  string    `gorm:"type:varchar(255)"`
+	Action     string    `gorm:"type:varchar(50)"`
+	EntityType string    `gorm:"type:varchar(50)"`
+	EntityID   string    `gorm:"type:varchar(64)"`
+	Details    string    `gorm:"type:text"`
+	CreatedAt  time.Time `gorm:"autoCreateTime;index"`
+}
+
+func (AuditLogModel) TableName() string {
+	return "audit_logs"
+}

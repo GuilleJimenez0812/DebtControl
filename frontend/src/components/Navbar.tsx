@@ -12,6 +12,7 @@ interface NavbarProps {
   onToggleTheme: () => void;
   onOpenAuthModal: () => void;
   onOpenAdminModal: () => void;
+  onOpenAuditLogsModal?: () => void;
   onOpenUploadInvoiceModal?: () => void;
   onLogout: () => void;
   onSeedData: () => void;
@@ -26,6 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
   onOpenAuthModal,
   onOpenAdminModal,
+  onOpenAuditLogsModal,
   onOpenUploadInvoiceModal,
   onLogout,
   onSeedData,
@@ -102,15 +104,32 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {/* Admin User Management Button */}
+          {/* Admin User Management Dropdown */}
           {user && user.role === 'admin' && (
-            <button
-              onClick={onOpenAdminModal}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold transition"
-            >
-              <Users className="w-3.5 h-3.5 text-purple-400" />
-              <span className="hidden sm:inline">User Permissions</span>
-            </button>
+            <div className="relative group">
+              <button
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold transition"
+              >
+                <Users className="w-3.5 h-3.5 text-purple-400" />
+                <span className="hidden sm:inline">Admin</span>
+              </button>
+              <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                <button
+                  onClick={onOpenAdminModal}
+                  className="w-full text-left flex items-center space-x-2 px-4 py-2.5 text-xs text-slate-300 hover:text-white hover:bg-slate-800 rounded-t-xl transition"
+                >
+                  <Users className="w-3.5 h-3.5 text-purple-400" />
+                  <span>User Permissions</span>
+                </button>
+                <button
+                  onClick={onOpenAuditLogsModal}
+                  className="w-full text-left flex items-center space-x-2 px-4 py-2.5 text-xs text-slate-300 hover:text-white hover:bg-slate-800 rounded-b-xl transition"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Audit Logs</span>
+                </button>
+              </div>
+            </div>
           )}
 
           {user ? (

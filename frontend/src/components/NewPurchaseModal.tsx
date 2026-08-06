@@ -267,7 +267,7 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">{t.itemAmount}</label>
               <input
@@ -287,17 +287,6 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
                 min="0"
                 value={taxAmount}
                 onChange={(e) => setTaxAmount(parseFloat(e.target.value) || 0)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-sm text-white font-mono"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">{t.shippingCost}</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={shippingCost}
-                onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-sm text-white font-mono"
               />
             </div>

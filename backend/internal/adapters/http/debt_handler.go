@@ -136,6 +136,32 @@ func (handler *DebtHandler) UpdatePackage(ginContext *gin.Context) {
 	})
 }
 
+func (handler *DebtHandler) CreatePackage(ginContext *gin.Context) {
+	purchaseID := ginContext.Param("id")
+	var requestPayload CreatePackageRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	pkg, err := handler.debtUseCase.CreateShippingPackage(
+		ginContext.Request.Context(),
+		purchaseID,
+		requestPayload.TrackingNumber,
+		requestPayload.ShippingCost,
+	)
+
+	if err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusCreated, gin.H{
+		"message": "shipping package created successfully",
+		"package": pkg,
+	})
+}
+
 func (handler *DebtHandler) RecordPayment(ginContext *gin.Context) {
 	var requestPayload RecordPaymentRequest
 	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
@@ -229,4 +255,43 @@ func (handler *DebtHandler) SeedData(ginContext *gin.Context) {
 		return
 	}
 	ginContext.JSON(http.StatusOK, gin.H{"message": "initial spreadsheet data seeded successfully"})
+}
+
+func (handler *DebtHandler) SearchOrders(ginContext *gin.Context) {
+	currentUser, exists := ginContext.Get("user")
+	if !exists {
+		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": "user context missing"})
+		return
+	}
+	userEntity := currentUser.(*domain.User)
+
+	query := ginContext.Query("q")
+	if query == "" {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": "search query 'q' is required"})
+		return
+	}
+
+	limit := 10 // Default limit
+
+	results, err := handler.debtUseCase.SearchOrders(ginContext.Request.Context(), query, userEntity, limit)
+	if err != nil {
+		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"results": results})
+}
+
+func (handler *DebtHandler) GetAuditLogs(ginContext *gin.Context) {
+	// Parse offset/limit if needed, using 50 by default
+	limit := 50
+	offset := 0
+
+	logs, err := handler.debtUseCase.GetAuditLogs(ginContext.Request.Context(), limit, offset)
+	if err != nil {
+		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"logs": logs})
 }

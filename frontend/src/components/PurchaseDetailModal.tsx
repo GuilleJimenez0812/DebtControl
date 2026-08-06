@@ -14,6 +14,7 @@ interface PurchaseDetailModalProps {
   onOpenPreviewInvoice?: (url: string) => void;
   onUpdatePurchase: (id: string, payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string }) => Promise<void>;
   onUpdatePackage: (id: string, payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
+  onCreatePackage?: (purchaseId: string, trackingNumber: string, shippingCost: number) => Promise<void>;
 }
 
 export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
@@ -26,6 +27,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   onOpenPreviewInvoice,
   onUpdatePurchase,
   onUpdatePackage,
+  onCreatePackage,
 }) => {
   const t = translations[language];
   const isAdmin = userRole === 'admin';
@@ -41,6 +43,11 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const [pkgWarehouse, setPkgWarehouse] = useState<boolean>(false);
   const [pkgPersonally, setPkgPersonally] = useState<boolean>(false);
   const [pkgDispatchDate, setPkgDispatchDate] = useState<string>('');
+
+  const [isAddingTracking, setIsAddingTracking] = useState<boolean>(false);
+  const [newTrackingNumber, setNewTrackingNumber] = useState<string>('');
+  const [newPkgShippingCost, setNewPkgShippingCost] = useState<number>(0);
+  const [isSubmittingTracking, setIsSubmittingTracking] = useState<boolean>(false);
 
   if (!isOpen || !purchase) return null;
 
@@ -78,6 +85,21 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
       dispatch_date: pkgDispatchDate,
     });
     setEditingPkgId(null);
+  };
+
+  const handleAddTracking = async () => {
+    if (!newTrackingNumber.trim() || !onCreatePackage) return;
+    setIsSubmittingTracking(true);
+    try {
+      await onCreatePackage(purchase.id, newTrackingNumber.trim(), newPkgShippingCost);
+      setNewTrackingNumber('');
+      setNewPkgShippingCost(0);
+      setIsAddingTracking(false);
+    } catch (error) {
+      console.error("Failed to add tracking:", error);
+    } finally {
+      setIsSubmittingTracking(false);
+    }
   };
 
   return (
@@ -171,16 +193,20 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white font-mono"
                 />
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">{t.shippingCost}</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={shippingCost}
-                  onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white font-mono"
-                />
-              </div>
+                  <div>
+                    <label className="block text-slate-400 mb-1">{t.shippingCost || 'Shipping ($)'}</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        disabled
+                        value={shippingCost}
+                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-2 text-xs text-slate-500 font-mono cursor-not-allowed"
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500" title="Shipping cost is calculated automatically from tracking records">
+                        <Package className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
             </div>
           )}
 
@@ -333,6 +359,59 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                 </div>
               );
             })
+          )}
+          
+          {/* Add Tracking Section */}
+          {isAdmin && (
+            <div className="mt-4 border-t border-slate-800/80 pt-4">
+              {!isAddingTracking ? (
+                <button
+                  onClick={() => setIsAddingTracking(true)}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 rounded-xl transition"
+                >
+                  {t.addTracking || '+ Add Tracking Number'}
+                </button>
+              ) : (
+                <div className="flex items-center space-x-2 flex-wrap sm:flex-nowrap gap-y-2">
+                  <input
+                    type="text"
+                    value={newTrackingNumber}
+                    onChange={(e) => setNewTrackingNumber(e.target.value)}
+                    placeholder={t.enterTracking || 'Enter tracking number (e.g. TBA...)'}
+                    className="flex-1 min-w-[150px] bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white"
+                  />
+                  <div className="flex items-center space-x-2">
+                    <span className="text-slate-400 text-xs">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newPkgShippingCost}
+                      onChange={(e) => setNewPkgShippingCost(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className="w-20 bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white font-mono"
+                    />
+                  </div>
+                  <button
+                    onClick={handleAddTracking}
+                    disabled={isSubmittingTracking || !newTrackingNumber.trim()}
+                    className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-semibold px-4 py-2 rounded-xl transition flex items-center"
+                  >
+                    {isSubmittingTracking ? '...' : (t.save || 'Save')}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAddingTracking(false);
+                      setNewTrackingNumber('');
+                    }}
+                    disabled={isSubmittingTracking}
+                    className="text-slate-400 hover:text-white p-2"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

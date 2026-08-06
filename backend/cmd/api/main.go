@@ -57,6 +57,7 @@ func main() {
 		&postgresAdapter.PurchaseItemModel{},
 		&postgresAdapter.PaymentTransactionModel{},
 		&postgresAdapter.ShippingPackageModel{},
+		&postgresAdapter.AuditLogModel{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to execute database migrations: %v", err)
@@ -84,10 +85,11 @@ func main() {
 	}
 
 	debtRepository := postgresAdapter.NewDebtRepository(databaseConnection)
+	auditRepository := postgresAdapter.NewAuditRepository(databaseConnection)
 
 	jwtSecret := getEnvOrDefault("JWT_SECRET", "super-secret-debtcontrol-jwt-key-2026")
 	authService := services.NewAuthService(userRepository, sessionRepository, jwtSecret)
-	debtService := services.NewDebtService(debtRepository, userRepository)
+	debtService := services.NewDebtService(debtRepository, auditRepository, userRepository)
 	adminService := services.NewAdminService(userRepository, debtRepository)
 
 	_ = debtService.SeedInitialSpreadsheetData(ctx)

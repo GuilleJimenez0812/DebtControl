@@ -43,12 +43,14 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 			// Read operations (available to all authenticated users, scoped by person permissions)
 			debtGroup.GET("/summary", debtHandler.GetDashboardSummary)
 			debtGroup.GET("/persons", debtHandler.ListPersons)
+			debtGroup.GET("/search", debtHandler.SearchOrders)
 
 			// Admin-only write/mutation operations
 			debtGroup.POST("/purchases", RequireAdminRole(), debtHandler.CreatePurchase)
 			debtGroup.POST("/purchases/upload-invoice", RequireAdminRole(), debtHandler.UploadInvoice)
 			debtGroup.POST("/purchases/confirm-invoice", RequireAdminRole(), debtHandler.ConfirmAttachInvoice)
 			debtGroup.PUT("/purchases/:id", RequireAdminRole(), debtHandler.UpdatePurchase)
+			debtGroup.POST("/purchases/:id/packages", RequireAdminRole(), debtHandler.CreatePackage)
 			debtGroup.PUT("/packages/:id", RequireAdminRole(), debtHandler.UpdatePackage)
 			debtGroup.POST("/payments", RequireAdminRole(), debtHandler.RecordPayment)
 			debtGroup.POST("/seed", RequireAdminRole(), debtHandler.SeedData)
@@ -60,6 +62,7 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 			adminGroup.GET("/users", adminHandler.ListUsers)
 			adminGroup.POST("/users", adminHandler.CreateUser)
 			adminGroup.PUT("/users/:id/persons", adminHandler.AssignPersons)
+			adminGroup.GET("/audit-logs", debtHandler.GetAuditLogs)
 		}
 	}
 

@@ -103,6 +103,14 @@ export const apiService = {
     return response.data;
   },
 
+  createPackage: async (purchaseId: string, trackingNumber: string, shippingCost: number): Promise<{ package: ShippingPackage }> => {
+    const response = await apiClient.post<{ package: ShippingPackage }>(`/debts/purchases/${purchaseId}/packages`, { 
+      tracking_number: trackingNumber,
+      shipping_cost: shippingCost 
+    });
+    return response.data;
+  },
+
   updatePackage: async (
     id: string,
     payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }
@@ -134,6 +142,15 @@ export const apiService = {
 
   assignUserPersons: async (userId: string, personIds: string[]) => {
     const response = await apiClient.put(`/admin/users/${userId}/persons`, { person_ids: personIds });
+    return response.data;
+  },
+
+  updateUserPerson: async (userId: string, personId: string): Promise<void> => {
+    await apiClient.put(`/admin/users/${userId}/person`, { person_id: personId });
+  },
+
+  getAuditLogs: async (limit: number = 50, offset: number = 0): Promise<{ logs: any[] }> => {
+    const response = await apiClient.get<{ logs: any[] }>(`/admin/audit-logs?limit=${limit}&offset=${offset}`);
     return response.data;
   },
 };
