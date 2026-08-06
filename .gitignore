@@ -17,6 +17,10 @@ backend/bin/
 *.env
 !.env.example
 
+# Agent skills & cache
+.agents/
+skills-lock.json
+
 # IDEs and OS
 .DS_Store
 .vscode/
