@@ -211,6 +211,7 @@ const DashboardContent: React.FC = () => {
                   <DebtTable
                     persons={summary?.persons || []}
                     language={language}
+                    userRole={user?.role}
                     onOpenPaymentModal={(person) => setSelectedPersonForPayment(person)}
                     onOpenPurchaseModal={() => setIsPurchaseOpen(true)}
                     onSelectPersonFilter={handleSelectPersonFromSummary}
@@ -276,6 +277,7 @@ const DashboardContent: React.FC = () => {
         packages={summary?.shipping_packages || []}
         isOpen={!!selectedPurchaseForModal}
         language={language}
+        userRole={user?.role}
         onClose={() => setSelectedPurchaseForModal(null)}
         onUpdatePurchase={async (id, payload) => {
           await updatePurchaseMutation.mutateAsync({ id, payload });

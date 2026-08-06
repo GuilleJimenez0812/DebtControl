@@ -40,13 +40,16 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 		debtGroup := apiGroup.Group("/debts")
 		debtGroup.Use(AuthMiddleware(authUseCase))
 		{
+			// Read operations (available to all authenticated users, scoped by person permissions)
 			debtGroup.GET("/summary", debtHandler.GetDashboardSummary)
 			debtGroup.GET("/persons", debtHandler.ListPersons)
-			debtGroup.POST("/purchases", debtHandler.CreatePurchase)
-			debtGroup.PUT("/purchases/:id", debtHandler.UpdatePurchase)
-			debtGroup.PUT("/packages/:id", debtHandler.UpdatePackage)
-			debtGroup.POST("/payments", debtHandler.RecordPayment)
-			debtGroup.POST("/seed", debtHandler.SeedData)
+
+			// Admin-only write/mutation operations
+			debtGroup.POST("/purchases", RequireAdminRole(), debtHandler.CreatePurchase)
+			debtGroup.PUT("/purchases/:id", RequireAdminRole(), debtHandler.UpdatePurchase)
+			debtGroup.PUT("/packages/:id", RequireAdminRole(), debtHandler.UpdatePackage)
+			debtGroup.POST("/payments", RequireAdminRole(), debtHandler.RecordPayment)
+			debtGroup.POST("/seed", RequireAdminRole(), debtHandler.SeedData)
 		}
 
 		adminGroup := apiGroup.Group("/admin")
