@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Person, PurchaseItem } from '../types';
 import type { ParseInvoiceResult } from '../services/api';
 import type { Language } from '../i18n/translations';
+import { generateMonthPeriodOptions } from './NewPurchaseModal';
 import { X, UploadCloud, AlertCircle, PlusCircle, CheckCircle2, User, Tag, FileText, Layers, Eye } from 'lucide-react';
 
 interface UploadInvoiceModalProps {
@@ -358,10 +359,14 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
                   <select
                     value={detailPeriod}
                     onChange={(e) => setDetailPeriod(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white font-semibold"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white font-semibold cursor-pointer"
                   >
-                    <option value="Julio-26">Julio-26</option>
-                    <option value="Agosto-26">Agosto-26</option>
+                    {generateMonthPeriodOptions().map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                    <option value="N/A">N/A</option>
                   </select>
                 </div>
 

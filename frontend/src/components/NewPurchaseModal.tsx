@@ -1,8 +1,37 @@
 import React, { useState } from 'react';
+import type { Language } from '../i18n/translations';
+import { translations } from '../i18n/translations';
+import type { Person } from '../types';
 import { X, PlusCircle } from 'lucide-react';
+
+export function generateMonthPeriodOptions(): string[] {
+  const monthsEs = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const now = new Date();
+  const options: string[] = [];
+
+  // Generate months starting from 2 months ago up to 6 months into the future
+  for (let i = -2; i <= 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const monthName = monthsEs[d.getMonth()];
+    const yearShort = d.getFullYear().toString().slice(-2);
+    options.push(`${monthName}-${yearShort}`);
+  }
+
+  // Ensure standard spreadsheet months exist
+  const defaults = ['Julio-26', 'Agosto-26'];
+  for (const def of defaults) {
+    if (!options.includes(def)) {
+      options.unshift(def);
+    }
+  }
+
+  return options;
+}
 
 interface NewPurchaseModalProps {
   isOpen: boolean;
+  language: Language;
+  persons?: Person[];
   onClose: () => void;
   onSubmit: (payload: {
     person_name: string;
@@ -17,16 +46,23 @@ interface NewPurchaseModalProps {
 
 export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
   isOpen,
+  language,
+  persons = [],
   onClose,
   onSubmit,
 }) => {
-  const [personName, setPersonName] = useState<string>('Vale');
+  const t = translations[language];
+  const monthOptions = generateMonthPeriodOptions();
+
+  const defaultPerson = persons[0]?.name || 'Yo';
+
+  const [personName, setPersonName] = useState<string>(defaultPerson);
   const [orderNumber, setOrderNumber] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [itemAmount, setItemAmount] = useState<number>(0);
   const [taxAmount, setTaxAmount] = useState<number>(0);
   const [shippingCost, setShippingCost] = useState<number>(0);
-  const [detailPeriod, setDetailPeriod] = useState<string>('Agosto-26');
+  const [detailPeriod, setDetailPeriod] = useState<string>(monthOptions[0] || 'Agosto-26');
   const [loading, setLoading] = useState<boolean>(false);
 
   if (!isOpen) return null;
@@ -46,11 +82,15 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
       });
       onClose();
     } catch {
-      alert('Failed to save purchase');
+      alert(language === 'es' ? 'Error al guardar la compra' : 'Failed to save purchase');
     } finally {
       setLoading(false);
     }
   };
+
+  const personNamesList = persons.length > 0
+    ? persons.map((p) => p.name)
+    : ['Mama', 'Papa', 'Vale', 'Antonio/Sonia', 'Yo'];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
@@ -61,55 +101,58 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
 
         <h3 className="text-xl font-bold text-white mb-1 flex items-center space-x-2">
           <PlusCircle className="w-5 h-5 text-indigo-400" />
-          <span>Record New Purchase</span>
+          <span>{t.recordNewPurchase}</span>
         </h3>
-        <p className="text-xs text-slate-400 mb-6">Add item, taxes, and shipping expenses for a person</p>
+        <p className="text-xs text-slate-400 mb-6">{t.recordPurchaseDesc}</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Person Name</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">{t.personName}</label>
               <select
                 value={personName}
                 onChange={(e) => setPersonName(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
               >
-                <option value="Mama">Mama</option>
-                <option value="Papa">Papa</option>
-                <option value="Vale">Vale</option>
-                <option value="Antonio/Sonia">Antonio/Sonia</option>
-                <option value="Yo">Yo</option>
+                {personNamesList.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Detail Period</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">{t.detailPeriod}</label>
               <select
                 value={detailPeriod}
                 onChange={(e) => setDetailPeriod(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
               >
-                <option value="Julio-26">Julio-26</option>
-                <option value="Agosto-26">Agosto-26</option>
+                {monthOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
                 <option value="N/A">N/A</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Item Description</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">{t.itemDescription}</label>
             <input
               type="text"
               required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Zapatos o Chaqueta"
+              placeholder={language === 'es' ? 'ej. Zapatos o Chaqueta' : 'e.g. Shoes or Jacket'}
               className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Order Number (Optional)</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">{t.orderNumberOptional}</label>
             <input
               type="text"
               value={orderNumber}
@@ -121,7 +164,7 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Item Amount ($)</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">{t.itemAmount}</label>
               <input
                 type="number"
                 step="0.01"
@@ -132,7 +175,7 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Tax ($)</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">{t.taxAmount}</label>
               <input
                 type="number"
                 step="0.01"
@@ -143,7 +186,7 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Shipping ($)</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">{t.shippingCost}</label>
               <input
                 type="number"
                 step="0.01"
@@ -161,7 +204,7 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
               disabled={loading}
               className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition shadow-lg shadow-indigo-600/20"
             >
-              {loading ? 'Saving...' : 'Save Purchase'}
+              {loading ? t.saving : t.savePurchase}
             </button>
           </div>
         </form>

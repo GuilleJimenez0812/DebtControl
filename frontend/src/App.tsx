@@ -298,6 +298,8 @@ const DashboardContent: React.FC = () => {
 
       <NewPurchaseModal
         isOpen={isPurchaseOpen}
+        language={language}
+        persons={summary?.persons || []}
         onClose={() => setIsPurchaseOpen(false)}
         onSubmit={async (payload) => {
           await purchaseMutation.mutateAsync(payload);
