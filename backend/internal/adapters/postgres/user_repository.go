@@ -30,10 +30,18 @@ func (repository *UserRepository) Create(ctx context.Context, user *domain.User)
 		UpdatedAt:    user.UpdatedAt,
 	}
 
-	return repository.databaseConnection.WithContext(ctx).Create(&model).Error
+	err := repository.databaseConnection.WithContext(ctx).Create(&model).Error
+	if err != nil {
+		return err
+	}
+
+	_ = repository.EnsureFirstUserIsAdmin(ctx)
+	return nil
 }
 
 func (repository *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
+	_ = repository.EnsureFirstUserIsAdmin(ctx)
+
 	var model UserModel
 	err := repository.databaseConnection.WithContext(ctx).Where("email = ?", email).First(&model).Error
 	if err != nil {
@@ -55,6 +63,8 @@ func (repository *UserRepository) FindByEmail(ctx context.Context, email string)
 }
 
 func (repository *UserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
+	_ = repository.EnsureFirstUserIsAdmin(ctx)
+
 	var model UserModel
 	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).First(&model).Error
 	if err != nil {
@@ -76,6 +86,8 @@ func (repository *UserRepository) FindByID(ctx context.Context, id string) (*dom
 }
 
 func (repository *UserRepository) FindAll(ctx context.Context) ([]*domain.User, error) {
+	_ = repository.EnsureFirstUserIsAdmin(ctx)
+
 	var models []UserModel
 	err := repository.databaseConnection.WithContext(ctx).Order("created_at ASC").Find(&models).Error
 	if err != nil {
@@ -95,6 +107,27 @@ func (repository *UserRepository) FindAll(ctx context.Context) ([]*domain.User, 
 		}
 	}
 	return users, nil
+}
+
+func (repository *UserRepository) EnsureFirstUserIsAdmin(ctx context.Context) error {
+	var count int64
+	err := repository.databaseConnection.WithContext(ctx).Model(&UserModel{}).Count(&count).Error
+	if err != nil || count == 0 {
+		return err
+	}
+
+	var firstUser UserModel
+	err = repository.databaseConnection.WithContext(ctx).Order("created_at ASC").First(&firstUser).Error
+	if err != nil {
+		return err
+	}
+
+	if firstUser.Role != string(domain.RoleAdmin) {
+		firstUser.Role = string(domain.RoleAdmin)
+		return repository.databaseConnection.WithContext(ctx).Model(&UserModel{}).Where("id = ?", firstUser.ID).Update("role", string(domain.RoleAdmin)).Error
+	}
+
+	return nil
 }
 
 func (repository *UserRepository) AssignPersonsToUser(ctx context.Context, userID string, personIDs []string) error {

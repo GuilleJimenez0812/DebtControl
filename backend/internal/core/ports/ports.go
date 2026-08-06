@@ -12,6 +12,7 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*domain.User, error)
 	FindByID(ctx context.Context, id string) (*domain.User, error)
 	FindAll(ctx context.Context) ([]*domain.User, error)
+	EnsureFirstUserIsAdmin(ctx context.Context) error
 
 	AssignPersonsToUser(ctx context.Context, userID string, personIDs []string) error
 	GetAssignedPersonIDs(ctx context.Context, userID string) ([]string, error)

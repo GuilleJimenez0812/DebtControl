@@ -63,8 +63,9 @@ func main() {
 	}
 	log.Println("Database migrations completed successfully.")
 
-	// Automatically promote ridge.mole4570@eagereverest.com and the first created user in the database to admin role
-	_ = databaseConnection.Exec("UPDATE users SET role = 'admin' WHERE LOWER(email) = 'ridge.mole4570@eagereverest.com' OR id IN (SELECT id FROM users ORDER BY created_at ASC LIMIT 1)").Error
+	userRepository := postgresAdapter.NewUserRepository(databaseConnection)
+	ctx := context.Background()
+	_ = userRepository.EnsureFirstUserIsAdmin(ctx)
 
 	var sessionRepository ports.SessionStore
 	redisHost := os.Getenv("REDIS_HOST")
@@ -82,7 +83,6 @@ func main() {
 		log.Println("Redis is disabled. Using in-memory session store fallback.")
 	}
 
-	userRepository := postgresAdapter.NewUserRepository(databaseConnection)
 	debtRepository := postgresAdapter.NewDebtRepository(databaseConnection)
 
 	jwtSecret := getEnvOrDefault("JWT_SECRET", "super-secret-debtcontrol-jwt-key-2026")
@@ -90,7 +90,6 @@ func main() {
 	debtService := services.NewDebtService(debtRepository, userRepository)
 	adminService := services.NewAdminService(userRepository, debtRepository)
 
-	ctx := context.Background()
 	_ = debtService.SeedInitialSpreadsheetData(ctx)
 
 	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService)
