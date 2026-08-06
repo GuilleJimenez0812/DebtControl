@@ -26,6 +26,7 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
   const t = translations[language];
 
   const uniquePersons = Array.from(new Set(purchases.map((p) => p.person_name)));
+  const uniquePeriods = Array.from(new Set(purchases.map((p) => p.detail_period || 'N/A'))).filter(Boolean);
 
   const filteredPurchases = purchases.filter((item) => {
     const matchesPerson = selectedPersonFilter === 'All' || item.person_name === selectedPersonFilter;
@@ -41,7 +42,11 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
             <ShoppingBag className="w-5 h-5 text-indigo-400" />
             <span>{t.purchasesTab}</span>
           </h2>
-          <p className="text-xs text-slate-400">Click any order to view breakdown, PDF invoice, and shipping tracking</p>
+          <p className="text-xs text-slate-400">
+            {language === 'es'
+              ? 'Haz clic en cualquier orden para ver desglose, factura PDF y rastreo de envíos'
+              : 'Click any order to view breakdown, PDF invoice, and shipping tracking'}
+          </p>
         </div>
 
         {/* Filters */}
@@ -52,7 +57,7 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
             <select
               value={selectedPersonFilter}
               onChange={(e) => onPersonFilterChange(e.target.value)}
-              className="bg-transparent text-white font-semibold focus:outline-none"
+              className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
             >
               <option value="All" className="bg-slate-900">{t.personFilter}</option>
               {uniquePersons.map((name) => (
@@ -63,24 +68,21 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
             </select>
           </div>
 
-          {/* Period Filter */}
-          <div className="flex items-center space-x-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <div className="flex bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs">
-              {['All', 'Julio-26', 'Agosto-26', 'N/A'].map((period) => (
-                <button
-                  key={period}
-                  onClick={() => onPeriodFilterChange(period)}
-                  className={`px-3 py-1 rounded-lg font-semibold transition ${
-                    selectedPeriodFilter === period
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
+          {/* Period Filter (Dynamic registered order months) */}
+          <div className="flex items-center space-x-2 bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-xl text-xs">
+            <Filter className="w-3.5 h-3.5 text-indigo-400" />
+            <select
+              value={selectedPeriodFilter}
+              onChange={(e) => onPeriodFilterChange(e.target.value)}
+              className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
+            >
+              <option value="All" className="bg-slate-900">{t.periodFilter}</option>
+              {uniquePeriods.map((period) => (
+                <option key={period} value={period} className="bg-slate-900">
                   {period}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </div>
         </div>
       </div>
@@ -90,7 +92,7 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
           <thead>
             <tr className="border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
               <th className="py-3 px-4">{t.person}</th>
-              <th className="py-3 px-4">Order / Item</th>
+              <th className="py-3 px-4">Order # / Item</th>
               <th className="py-3 px-4">{t.itemAmount}</th>
               <th className="py-3 px-4">{t.taxAmount}</th>
               <th className="py-3 px-4">{t.shippingCost}</th>
@@ -110,9 +112,11 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                   {item.person_name}
                 </td>
                 <td className="py-3.5 px-4 text-slate-200 font-medium">
-                  <div className="group-hover:text-indigo-300 transition">{item.description}</div>
-                  {item.order_number && (
-                    <div className="text-xs text-slate-500 font-mono">{item.order_number}</div>
+                  <div className="font-mono font-bold text-white group-hover:text-indigo-300 transition">
+                    {item.order_number || item.description}
+                  </div>
+                  {item.description && item.description !== item.order_number && (
+                    <div className="text-xs text-slate-400 font-sans mt-0.5">{item.description}</div>
                   )}
                 </td>
                 <td className="py-3.5 px-4 font-mono text-slate-300">
