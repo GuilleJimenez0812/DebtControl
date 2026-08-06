@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DashboardSummary, User } from '../types';
+import type { DashboardSummary, User, PurchaseItem, ShippingPackage } from '../types';
 
 const apiClient = axios.create({
   baseURL: '/api/v1',
@@ -55,6 +55,22 @@ export const apiService = {
     detail_period: string;
   }) => {
     const response = await apiClient.post('/debts/purchases', payload);
+    return response.data;
+  },
+
+  updatePurchase: async (
+    id: string,
+    payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string }
+  ): Promise<{ purchase: PurchaseItem }> => {
+    const response = await apiClient.put<{ purchase: PurchaseItem }>(`/debts/purchases/${id}`, payload);
+    return response.data;
+  },
+
+  updatePackage: async (
+    id: string,
+    payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }
+  ): Promise<{ package: ShippingPackage }> => {
+    const response = await apiClient.put<{ package: ShippingPackage }>(`/debts/packages/${id}`, payload);
     return response.data;
   },
 

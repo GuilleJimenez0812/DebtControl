@@ -107,6 +107,49 @@ func (service *DebtService) CreatePurchaseItem(ctx context.Context, personName s
 	return newItem, nil
 }
 
+func (service *DebtService) UpdatePurchaseItem(ctx context.Context, id string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string) (*domain.PurchaseItem, error) {
+	item, err := service.debtRepo.FindPurchaseByID(ctx, id)
+	if err != nil || item == nil {
+		return nil, domain.ErrPurchaseItemNotFound
+	}
+
+	item.ItemAmount = itemAmount
+	item.TaxAmount = taxAmount
+	item.ShippingCost = shippingCost
+	if invoiceURL != "" {
+		item.InvoiceURL = invoiceURL
+	}
+	item.RecalculateTotalCost()
+
+	err = service.debtRepo.SavePurchase(ctx, item)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = service.debtRepo.RecalculateAllBalances(ctx)
+	return item, nil
+}
+
+func (service *DebtService) UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error) {
+	pkg, err := service.debtRepo.FindPackageByID(ctx, id)
+	if err != nil || pkg == nil {
+		return nil, domain.ErrPackageNotFound
+	}
+
+	pkg.ShippingCost = shippingCost
+	pkg.WarehouseReceived = warehouseReceived
+	pkg.PersonallyReceived = personallyReceived
+	pkg.DispatchDate = dispatchDate
+	pkg.UpdatedAt = time.Now()
+
+	err = service.debtRepo.SavePackage(ctx, pkg)
+	if err != nil {
+		return nil, err
+	}
+
+	return pkg, nil
+}
+
 func (service *DebtService) RecordPayment(ctx context.Context, personID string, amount float64, notes string) (*domain.PaymentTransaction, error) {
 	person, err := service.debtRepo.FindPersonByID(ctx, personID)
 	if err != nil || person == nil {

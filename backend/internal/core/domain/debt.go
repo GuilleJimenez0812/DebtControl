@@ -9,6 +9,7 @@ var (
 	ErrPersonNotFound      = errors.New("person not found")
 	ErrInvalidAmount        = errors.New("amount must be greater than zero")
 	ErrPurchaseItemNotFound = errors.New("purchase item not found")
+	ErrPackageNotFound      = errors.New("shipping package not found")
 )
 
 type PersonStatus string
@@ -65,6 +66,7 @@ type PurchaseItem struct {
 	ShippingCost  float64   `json:"shipping_cost"`
 	TotalCost     float64   `json:"total_cost"`
 	DetailPeriod  string    `json:"detail_period"`
+	InvoiceURL    string    `json:"invoice_url"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
@@ -88,9 +90,15 @@ func NewPurchaseItem(id string, personID string, personName string, orderNumber 
 		ShippingCost: shippingCost,
 		TotalCost:    totalCost,
 		DetailPeriod: detailPeriod,
+		InvoiceURL:   "",
 		CreatedAt:    currentTime,
 		UpdatedAt:    currentTime,
 	}, nil
+}
+
+func (item *PurchaseItem) RecalculateTotalCost() {
+	item.TotalCost = item.ItemAmount + item.TaxAmount + item.ShippingCost
+	item.UpdatedAt = time.Now()
 }
 
 type PaymentTransaction struct {
@@ -102,13 +110,15 @@ type PaymentTransaction struct {
 }
 
 type ShippingPackage struct {
-	ID                string    `json:"id"`
-	OrderNumber       string    `json:"order_number"`
-	TrackingNumber    string    `json:"tracking_number"`
-	ShippingCost      float64   `json:"shipping_cost"`
-	ItemDescription   string    `json:"item_description"`
-	WarehouseReceived bool      `json:"warehouse_received"`
-	DispatchDate      string    `json:"dispatch_date"`
-	BatchMonth        string    `json:"batch_month"`
-	CreatedAt         time.Time `json:"created_at"`
+	ID                 string    `json:"id"`
+	OrderNumber        string    `json:"order_number"`
+	TrackingNumber     string    `json:"tracking_number"`
+	ShippingCost       float64   `json:"shipping_cost"`
+	ItemDescription    string    `json:"item_description"`
+	WarehouseReceived  bool      `json:"warehouse_received"`
+	PersonallyReceived bool      `json:"personally_received"`
+	DispatchDate       string    `json:"dispatch_date"`
+	BatchMonth         string    `json:"batch_month"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }

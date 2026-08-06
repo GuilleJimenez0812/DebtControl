@@ -19,6 +19,7 @@ type DebtRepository interface {
 	SavePerson(ctx context.Context, person *domain.Person) error
 
 	FindAllPurchases(ctx context.Context) ([]*domain.PurchaseItem, error)
+	FindPurchaseByID(ctx context.Context, id string) (*domain.PurchaseItem, error)
 	SavePurchase(ctx context.Context, purchase *domain.PurchaseItem) error
 	DeletePurchase(ctx context.Context, id string) error
 
@@ -26,6 +27,7 @@ type DebtRepository interface {
 	SavePayment(ctx context.Context, payment *domain.PaymentTransaction) error
 
 	FindAllPackages(ctx context.Context) ([]*domain.ShippingPackage, error)
+	FindPackageByID(ctx context.Context, id string) (*domain.ShippingPackage, error)
 	SavePackage(ctx context.Context, pkg *domain.ShippingPackage) error
 
 	RecalculateAllBalances(ctx context.Context) error
@@ -57,6 +59,8 @@ type DebtUseCase interface {
 	GetDashboardSummary(ctx context.Context) (*DashboardSummary, error)
 	ListPersons(ctx context.Context) ([]*domain.Person, error)
 	CreatePurchaseItem(ctx context.Context, personName string, orderNumber string, description string, amount float64, tax float64, shipping float64, detailPeriod string) (*domain.PurchaseItem, error)
+	UpdatePurchaseItem(ctx context.Context, id string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string) (*domain.PurchaseItem, error)
+	UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error)
 	RecordPayment(ctx context.Context, personID string, amount float64, notes string) (*domain.PaymentTransaction, error)
 	SeedInitialSpreadsheetData(ctx context.Context) error
 }

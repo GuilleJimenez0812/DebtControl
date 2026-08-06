@@ -65,6 +65,62 @@ func (handler *DebtHandler) CreatePurchase(ginContext *gin.Context) {
 	})
 }
 
+func (handler *DebtHandler) UpdatePurchase(ginContext *gin.Context) {
+	id := ginContext.Param("id")
+	var requestPayload UpdatePurchaseRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	purchase, err := handler.debtUseCase.UpdatePurchaseItem(
+		ginContext.Request.Context(),
+		id,
+		requestPayload.ItemAmount,
+		requestPayload.TaxAmount,
+		requestPayload.ShippingCost,
+		requestPayload.InvoiceURL,
+	)
+
+	if err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{
+		"message":  "purchase item updated successfully",
+		"purchase": purchase,
+	})
+}
+
+func (handler *DebtHandler) UpdatePackage(ginContext *gin.Context) {
+	id := ginContext.Param("id")
+	var requestPayload UpdatePackageRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	pkg, err := handler.debtUseCase.UpdateShippingPackage(
+		ginContext.Request.Context(),
+		id,
+		requestPayload.ShippingCost,
+		requestPayload.WarehouseReceived,
+		requestPayload.PersonallyReceived,
+		requestPayload.DispatchDate,
+	)
+
+	if err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{
+		"message": "shipping package updated successfully",
+		"package": pkg,
+	})
+}
+
 func (handler *DebtHandler) RecordPayment(ginContext *gin.Context) {
 	var requestPayload RecordPaymentRequest
 	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {

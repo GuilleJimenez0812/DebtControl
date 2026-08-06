@@ -31,7 +31,7 @@ services:
 
   api:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: debtcontrol_api
     ports:
@@ -54,7 +54,7 @@ services:
 
   frontend:
     build:
-      context: ../frontend
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: debtcontrol_frontend
     ports:
