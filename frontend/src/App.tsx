@@ -275,6 +275,7 @@ const DashboardContent: React.FC = () => {
         persons={summary?.persons || []}
         language={language}
         onClose={() => setIsUploadInvoiceOpen(false)}
+        onOpenPreviewInvoice={(url) => setPreviewInvoiceUrl(url)}
         onUpload={async (file) => {
           const res = await apiService.uploadInvoice(file);
           return res;

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { Person, PurchaseItem } from '../types';
 import type { ParseInvoiceResult } from '../services/api';
 import type { Language } from '../i18n/translations';
-import { X, UploadCloud, AlertCircle, PlusCircle, CheckCircle2, User, Tag, FileText, Layers } from 'lucide-react';
+import { X, UploadCloud, AlertCircle, PlusCircle, CheckCircle2, User, Tag, FileText, Layers, Eye } from 'lucide-react';
 
 interface UploadInvoiceModalProps {
   isOpen: boolean;
@@ -11,6 +11,7 @@ interface UploadInvoiceModalProps {
   onClose: () => void;
   onUpload: (file: File) => Promise<ParseInvoiceResult>;
   onConfirmAttach: (purchaseId: string, invoiceFilename: string, mode: 'replace' | 'append') => Promise<void>;
+  onOpenPreviewInvoice?: (url: string) => void;
   onCreatePurchase: (payload: {
     person_name: string;
     order_number: string;
@@ -29,9 +30,11 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
   onClose,
   onUpload,
   onConfirmAttach,
+  onOpenPreviewInvoice,
   onCreatePurchase,
 }) => {
   const [file, setFile] = useState<File | null>(null);
+  const [fileBlobUrl, setFileBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [result, setResult] = useState<ParseInvoiceResult | null>(null);
   const [attachMode, setAttachMode] = useState<'replace' | 'append'>('replace');
@@ -43,7 +46,9 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selected = e.target.files[0];
+      setFile(selected);
+      setFileBlobUrl(URL.createObjectURL(selected));
       setError('');
       setResult(null);
     }
@@ -70,7 +75,8 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
     setLoading(true);
     setError('');
     try {
-      await onConfirmAttach(item.id, file.name, attachMode);
+      const targetUrl = fileBlobUrl || file.name;
+      await onConfirmAttach(item.id, targetUrl, attachMode);
       onClose();
     } catch {
       setError(language === 'es' ? 'Error al vincular la factura.' : 'Failed to attach invoice.');
@@ -145,6 +151,17 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
               <p className="text-xs text-slate-400 mt-1">Amazon receipts, PDF invoices</p>
             </div>
 
+            {fileBlobUrl && onOpenPreviewInvoice && (
+              <button
+                type="button"
+                onClick={() => onOpenPreviewInvoice(fileBlobUrl)}
+                className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-indigo-500/50 text-indigo-300 font-bold text-xs flex items-center justify-center space-x-2 transition"
+              >
+                <Eye className="w-4 h-4 text-indigo-400" />
+                <span>{language === 'es' ? 'Previsualizar PDF Seleccionado' : 'Preview Selected PDF'}</span>
+              </button>
+            )}
+
             <button
               type="submit"
               disabled={!file || loading}
@@ -157,18 +174,31 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
           <div className="space-y-6">
             {result.matched && result.matched_purchase_item ? (
               <div className="glass-card p-6 rounded-2xl border-emerald-500/40 bg-emerald-950/10 space-y-5">
-                <div className="flex items-center space-x-3 border-b border-emerald-500/20 pb-3">
-                  <div className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400">
-                    <CheckCircle2 className="w-6 h-6" />
+                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400">
+                      <CheckCircle2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-base font-bold text-white">
+                        {language === 'es' ? '¡Pedido Encontrado en el Sistema!' : 'Matching Order Found!'}
+                      </h4>
+                      <p className="text-xs text-emerald-300">
+                        {language === 'es' ? 'Verifica los detalles del pedido antes de confirmar la vinculación' : 'Verify order details before confirming attachment'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-base font-bold text-white">
-                      {language === 'es' ? '¡Pedido Encontrado en el Sistema!' : 'Matching Order Found!'}
-                    </h4>
-                    <p className="text-xs text-emerald-300">
-                      {language === 'es' ? 'Verifica los detalles del pedido antes de confirmar la vinculación' : 'Verify order details before confirming attachment'}
-                    </p>
-                  </div>
+
+                  {fileBlobUrl && onOpenPreviewInvoice && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenPreviewInvoice(fileBlobUrl)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>{language === 'es' ? 'Ver PDF' : 'View PDF'}</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Detailed Order Match Summary */}
@@ -203,11 +233,23 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
                 {/* Check if invoice already attached */}
                 {result.matched_purchase_item.invoice_url ? (
                   <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-3">
-                    <div className="flex items-center space-x-2 text-amber-400 text-xs font-semibold">
-                      <AlertCircle className="w-4 h-4" />
-                      <span>
-                        {language === 'es' ? 'Esta orden ya tiene factura adjunta:' : 'This order already has an attached invoice:'}
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-amber-400 text-xs font-semibold">
+                        <AlertCircle className="w-4 h-4" />
+                        <span>
+                          {language === 'es' ? 'Esta orden ya tiene factura adjunta:' : 'This order already has an attached invoice:'}
+                        </span>
+                      </div>
+                      {onOpenPreviewInvoice && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenPreviewInvoice(result.matched_purchase_item?.invoice_url || '')}
+                          className="flex items-center space-x-1 text-xs text-amber-300 hover:underline font-bold"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>{language === 'es' ? 'Ver Previa' : 'Preview'}</span>
+                        </button>
+                      )}
                     </div>
                     <p className="text-xs font-mono text-slate-300 truncate bg-slate-900 p-2 rounded-lg">
                       {result.matched_purchase_item.invoice_url}
