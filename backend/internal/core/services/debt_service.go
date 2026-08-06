@@ -7,6 +7,7 @@ import (
 
 	"debtcontrol/backend/internal/core/domain"
 	"debtcontrol/backend/internal/core/ports"
+	"debtcontrol/backend/pkg/pdf"
 
 	"github.com/google/uuid"
 )
@@ -244,8 +245,17 @@ func (service *DebtService) RecordPayment(ctx context.Context, personID string, 
 func (service *DebtService) SeedInitialSpreadsheetData(ctx context.Context) error {
 	existingPersons, err := service.debtRepo.FindAllPersons(ctx)
 	if err == nil && len(existingPersons) > 0 {
-		return nil // Already seeded
+		return nil // Already seeded! Do not wipe user modifications!
 	}
+	return service.forceSeedData(ctx)
+}
+
+func (service *DebtService) ResetAndSeedData(ctx context.Context) error {
+	_ = service.debtRepo.ResetAllData(ctx)
+	return service.forceSeedData(ctx)
+}
+
+func (service *DebtService) forceSeedData(ctx context.Context) error {
 
 	personMap := make(map[string]*domain.Person)
 
@@ -370,4 +380,48 @@ func (service *DebtService) SeedInitialSpreadsheetData(ctx context.Context) erro
 	}
 
 	return nil
+}
+
+func (service *DebtService) ProcessInvoiceUpload(ctx context.Context, fileBytes []byte, filename string) (*ports.ParseInvoiceResult, error) {
+	parsedData := pdf.ParseInvoiceContent(fileBytes)
+
+	result := &ports.ParseInvoiceResult{
+		OrderNumber:  parsedData.OrderNumber,
+		Description:  parsedData.Description,
+		ItemAmount:   parsedData.ItemAmount,
+		TaxAmount:    parsedData.TaxAmount,
+		ShippingCost: parsedData.ShippingCost,
+		TotalCost:    parsedData.TotalCost,
+		Matched:      false,
+	}
+
+	if parsedData.OrderNumber != "" {
+		matchedItem, err := service.debtRepo.FindPurchaseItemByOrderNumber(ctx, parsedData.OrderNumber)
+		if err == nil && matchedItem != nil {
+			result.Matched = true
+			result.MatchedPurchaseItem = matchedItem
+		}
+	}
+
+	return result, nil
+}
+
+func (service *DebtService) ConfirmAttachInvoice(ctx context.Context, purchaseID string, invoiceFilename string, mode string) (*domain.PurchaseItem, error) {
+	item, err := service.debtRepo.FindPurchaseByID(ctx, purchaseID)
+	if err != nil || item == nil {
+		return nil, domain.ErrPurchaseItemNotFound
+	}
+
+	if mode == "append" && item.InvoiceURL != "" {
+		item.InvoiceURL = item.InvoiceURL + ", " + invoiceFilename
+	} else {
+		item.InvoiceURL = invoiceFilename
+	}
+
+	err = service.debtRepo.SavePurchase(ctx, item)
+	if err != nil {
+		return nil, err
+	}
+
+	return item, nil
 }

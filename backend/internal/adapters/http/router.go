@@ -46,6 +46,8 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 
 			// Admin-only write/mutation operations
 			debtGroup.POST("/purchases", RequireAdminRole(), debtHandler.CreatePurchase)
+			debtGroup.POST("/purchases/upload-invoice", RequireAdminRole(), debtHandler.UploadInvoice)
+			debtGroup.POST("/purchases/confirm-invoice", RequireAdminRole(), debtHandler.ConfirmAttachInvoice)
 			debtGroup.PUT("/purchases/:id", RequireAdminRole(), debtHandler.UpdatePurchase)
 			debtGroup.PUT("/packages/:id", RequireAdminRole(), debtHandler.UpdatePackage)
 			debtGroup.POST("/payments", RequireAdminRole(), debtHandler.RecordPayment)

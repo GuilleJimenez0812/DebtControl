@@ -15,6 +15,17 @@ export interface UserWithPersons {
   assigned_person_ids: string[];
 }
 
+export interface ParseInvoiceResult {
+  order_number: string;
+  description: string;
+  item_amount: number;
+  tax_amount: number;
+  shipping_cost: number;
+  total_cost: number;
+  matched: boolean;
+  matched_purchase_item?: PurchaseItem;
+}
+
 export const apiService = {
   // Auth
   register: async (email: string, password: string, fullName: string) => {
@@ -61,6 +72,26 @@ export const apiService = {
     detail_period: string;
   }) => {
     const response = await apiClient.post('/debts/purchases', payload);
+    return response.data;
+  },
+
+  uploadInvoice: async (file: File): Promise<ParseInvoiceResult> => {
+    const formData = new FormData();
+    formData.append('invoice_file', file);
+    const response = await apiClient.post<ParseInvoiceResult>('/debts/purchases/upload-invoice', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  confirmAttachInvoice: async (purchaseId: string, invoiceFilename: string, mode: 'replace' | 'append' = 'replace') => {
+    const response = await apiClient.post<{ purchase: PurchaseItem }>('/debts/purchases/confirm-invoice', {
+      purchase_id: purchaseId,
+      invoice_filename: invoiceFilename,
+      mode,
+    });
     return response.data;
   },
 

@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"errors"
+	"regexp"
+	"strings"
 
 	"debtcontrol/backend/internal/core/domain"
 
@@ -131,6 +133,80 @@ func (repository *DebtRepository) FindPurchaseByID(ctx context.Context, id strin
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
 	}, nil
+}
+
+func (repository *DebtRepository) FindPurchaseItemByOrderNumber(ctx context.Context, orderNumber string) (*domain.PurchaseItem, error) {
+	trimmed := strings.TrimSpace(orderNumber)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	cleanNumber := extractCoreOrderNumber(trimmed)
+
+	// 1. Try exact match
+	var model PurchaseItemModel
+	err := repository.databaseConnection.WithContext(ctx).Where("order_number = ?", trimmed).First(&model).Error
+	if err == nil {
+		return repository.toDomainPurchaseItem(&model), nil
+	}
+
+	// 2. Try LIKE match with clean digits/hyphen number
+	if cleanNumber != "" {
+		err = repository.databaseConnection.WithContext(ctx).Where("order_number LIKE ?", "%"+cleanNumber+"%").First(&model).Error
+		if err == nil {
+			return repository.toDomainPurchaseItem(&model), nil
+		}
+	}
+
+	// 3. Fallback: Search all purchases and check if clean number matches
+	var allModels []PurchaseItemModel
+	err = repository.databaseConnection.WithContext(ctx).Find(&allModels).Error
+	if err == nil {
+		for _, m := range allModels {
+			mClean := extractCoreOrderNumber(m.OrderNumber)
+			if mClean != "" && cleanNumber != "" {
+				if strings.Contains(mClean, cleanNumber) || strings.Contains(cleanNumber, mClean) {
+					return repository.toDomainPurchaseItem(&m), nil
+				}
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+func (repository *DebtRepository) toDomainPurchaseItem(model *PurchaseItemModel) *domain.PurchaseItem {
+	return &domain.PurchaseItem{
+		ID:           model.ID,
+		PersonID:     model.PersonID,
+		PersonName:   model.PersonName,
+		OrderNumber:  model.OrderNumber,
+		Description:  model.Description,
+		ItemAmount:   model.ItemAmount,
+		TaxAmount:    model.TaxAmount,
+		ShippingCost: model.ShippingCost,
+		TotalCost:    model.TotalCost,
+		DetailPeriod: model.DetailPeriod,
+		InvoiceURL:   model.InvoiceURL,
+		CreatedAt:    model.CreatedAt,
+		UpdatedAt:    model.UpdatedAt,
+	}
+}
+
+func extractCoreOrderNumber(input string) string {
+	re := regexp.MustCompile(`\b\d{3}-\d{7}-\d{7}\b`)
+	if match := re.FindString(input); match != "" {
+		return match
+	}
+	reDigits := regexp.MustCompile(`[0-9-]+`)
+	matches := reDigits.FindAllString(input, -1)
+	var longest string
+	for _, m := range matches {
+		if len(m) > len(longest) && len(m) >= 5 {
+			longest = m
+		}
+	}
+	return longest
 }
 
 func (repository *DebtRepository) SavePurchase(ctx context.Context, purchase *domain.PurchaseItem) error {
@@ -281,6 +357,13 @@ func (repository *DebtRepository) RecalculateAllBalances(ctx context.Context) er
 		person.RecalculateBalance()
 		_ = repository.SavePerson(ctx, person)
 	}
+	return nil
+}
 
+func (repository *DebtRepository) ResetAllData(ctx context.Context) error {
+	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM payment_transactions;").Error
+	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM purchase_items;").Error
+	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM shipping_packages;").Error
+	_ = repository.databaseConnection.WithContext(ctx).Exec("DELETE FROM persons;").Error
 	return nil
 }

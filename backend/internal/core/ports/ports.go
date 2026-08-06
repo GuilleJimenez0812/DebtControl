@@ -25,6 +25,7 @@ type DebtRepository interface {
 
 	FindAllPurchases(ctx context.Context) ([]*domain.PurchaseItem, error)
 	FindPurchaseByID(ctx context.Context, id string) (*domain.PurchaseItem, error)
+	FindPurchaseItemByOrderNumber(ctx context.Context, orderNumber string) (*domain.PurchaseItem, error)
 	SavePurchase(ctx context.Context, purchase *domain.PurchaseItem) error
 	DeletePurchase(ctx context.Context, id string) error
 
@@ -36,6 +37,7 @@ type DebtRepository interface {
 	SavePackage(ctx context.Context, pkg *domain.ShippingPackage) error
 
 	RecalculateAllBalances(ctx context.Context) error
+	ResetAllData(ctx context.Context) error
 }
 
 type SessionStore interface {
@@ -72,6 +74,17 @@ type DashboardSummary struct {
 	ShippingPackages []*domain.ShippingPackage `json:"shipping_packages"`
 }
 
+type ParseInvoiceResult struct {
+	OrderNumber         string               `json:"order_number"`
+	Description         string               `json:"description"`
+	ItemAmount          float64              `json:"item_amount"`
+	TaxAmount           float64              `json:"tax_amount"`
+	ShippingCost        float64              `json:"shipping_cost"`
+	TotalCost           float64              `json:"total_cost"`
+	Matched             bool                 `json:"matched"`
+	MatchedPurchaseItem *domain.PurchaseItem `json:"matched_purchase_item,omitempty"`
+}
+
 type DebtUseCase interface {
 	GetDashboardSummaryForUser(ctx context.Context, user *domain.User) (*DashboardSummary, error)
 	ListPersonsForUser(ctx context.Context, user *domain.User) ([]*domain.Person, error)
@@ -79,5 +92,8 @@ type DebtUseCase interface {
 	UpdatePurchaseItem(ctx context.Context, id string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string) (*domain.PurchaseItem, error)
 	UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error)
 	RecordPayment(ctx context.Context, personID string, amount float64, notes string) (*domain.PaymentTransaction, error)
+	ProcessInvoiceUpload(ctx context.Context, fileBytes []byte, filename string) (*ParseInvoiceResult, error)
+	ConfirmAttachInvoice(ctx context.Context, purchaseID string, invoiceFilename string, mode string) (*domain.PurchaseItem, error)
 	SeedInitialSpreadsheetData(ctx context.Context) error
+	ResetAndSeedData(ctx context.Context) error
 }
