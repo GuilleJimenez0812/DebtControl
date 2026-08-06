@@ -251,8 +251,10 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
                         </button>
                       )}
                     </div>
-                    <p className="text-xs font-mono text-slate-300 truncate bg-slate-900 p-2 rounded-lg">
-                      {result.matched_purchase_item.invoice_url}
+                    <p className="text-xs font-mono text-slate-300 truncate bg-slate-900 p-2 rounded-lg" title={result.matched_purchase_item.invoice_url}>
+                      {result.matched_purchase_item.invoice_url.startsWith('blob:')
+                        ? `Factura_${result.matched_purchase_item.order_number || 'Pedido'}.pdf`
+                        : result.matched_purchase_item.invoice_url.split('/').pop()}
                     </p>
 
                     <div className="space-y-2 pt-1">

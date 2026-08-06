@@ -195,22 +195,28 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
               <p className="text-slate-500 italic">{t.noInvoice}</p>
             ) : (
               <div className="space-y-1.5">
-                {attachedInvoices.map((invUrl, index) => (
-                  <div key={index} className="flex items-center justify-between bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                    <span className="font-mono text-slate-300 text-xs truncate max-w-[280px]">
-                      {invUrl}
-                    </span>
-                    {onOpenPreviewInvoice && (
-                      <button
-                        onClick={() => onOpenPreviewInvoice(invUrl)}
-                        className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>{language === 'es' ? 'Ver Factura' : 'View Invoice'}</span>
-                      </button>
-                    )}
-                  </div>
-                ))}
+                {attachedInvoices.map((invUrl, index) => {
+                  const cleanName = invUrl.startsWith('blob:')
+                    ? `Factura_${purchase.order_number || 'Pedido'}.pdf`
+                    : invUrl.split('/').pop() || invUrl;
+
+                  return (
+                    <div key={index} className="flex items-center justify-between bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                      <span className="font-mono text-slate-300 text-xs truncate max-w-[280px]" title={cleanName}>
+                        {cleanName}
+                      </span>
+                      {onOpenPreviewInvoice && (
+                        <button
+                          onClick={() => onOpenPreviewInvoice(invUrl)}
+                          className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>{language === 'es' ? 'Ver Factura' : 'View Invoice'}</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
