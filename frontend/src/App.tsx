@@ -169,9 +169,11 @@ const DashboardContent: React.FC = () => {
         ) : (
           <>
             <SummaryCards
+              persons={summary?.persons || []}
               totalOutstanding={summary?.total_outstanding || 0}
-              totalJuly26={summary?.total_july_26 || 0}
-              totalAugust26={summary?.total_august_26 || 0}
+              language={language}
+              selectedPersonFilter={selectedPersonFilter}
+              onSelectPersonFilter={handleSelectPersonFromSummary}
             />
 
             {/* View Tabs */}
