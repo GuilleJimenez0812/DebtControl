@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	accessCookieName          = "access_token"
-	refreshCookieName         = "refresh_token"
+	accessCookieName           = "access_token"
+	refreshCookieName          = "refresh_token"
 	accessCookieMaxAgeSeconds  = 15 * 60
 	refreshCookieMaxAgeSeconds = 7 * 24 * 60 * 60
 )
@@ -84,17 +84,50 @@ func (handler *AuthHandler) Login(ginContext *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, user, err := handler.authUseCase.Login(ginContext.Request.Context(), requestPayload.Email, requestPayload.Password)
+	loginResult, err := handler.authUseCase.Login(ginContext.Request.Context(), requestPayload.Email, requestPayload.Password)
 	if err != nil {
 		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	setAuthCookies(ginContext, accessToken, refreshToken)
+	// MFA gate: password was correct but the second factor is pending.
+	if loginResult.MFAPendingLogin {
+		ginContext.JSON(http.StatusOK, gin.H{
+			"message":       "mfa required",
+			"mfa_pending":   true,
+			"mfa_ticket":    loginResult.MFATicket,
+			"totp_required": true,
+			"user":          loginResult.User,
+		})
+		return
+	}
+
+	setAuthCookies(ginContext, loginResult.AccessToken, loginResult.RefreshToken)
 
 	ginContext.JSON(http.StatusOK, gin.H{
 		"message": "login successful",
-		"user":    user,
+		"user":    loginResult.User,
+	})
+}
+
+func (handler *AuthHandler) CompleteLoginWithTOTP(ginContext *gin.Context) {
+	var requestPayload MFALoginRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	loginResult, err := handler.authUseCase.CompleteLoginWithTOTP(ginContext.Request.Context(), requestPayload.MFATicket, requestPayload.Code)
+	if err != nil {
+		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	setAuthCookies(ginContext, loginResult.AccessToken, loginResult.RefreshToken)
+
+	ginContext.JSON(http.StatusOK, gin.H{
+		"message": "login successful",
+		"user":    loginResult.User,
 	})
 }
 
@@ -160,4 +193,86 @@ func (handler *AuthHandler) GetCurrentUser(ginContext *gin.Context) {
 
 	userEntity := currentUser.(*domain.User)
 	ginContext.JSON(http.StatusOK, gin.H{"user": userEntity})
+}
+
+func (handler *AuthHandler) GenerateTOTP(ginContext *gin.Context) {
+	currentUser, exists := ginContext.Get("user")
+	if !exists {
+		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized access"})
+		return
+	}
+	userEntity := currentUser.(*domain.User)
+
+	secret, provisioningURI, err := handler.authUseCase.GenerateTOTP(ginContext.Request.Context(), userEntity.ID)
+	if err != nil {
+		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{
+		"message":          "totp provisioned",
+		"secret":           secret,
+		"provisioning_uri": provisioningURI,
+	})
+}
+
+func (handler *AuthHandler) EnableTOTP(ginContext *gin.Context) {
+	var requestPayload TOTPCodeRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	currentUser, exists := ginContext.Get("user")
+	if !exists {
+		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized access"})
+		return
+	}
+	userEntity := currentUser.(*domain.User)
+
+	if err := handler.authUseCase.EnableTOTP(ginContext.Request.Context(), userEntity.ID, requestPayload.Code); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"message": "totp enabled", "totp_enabled": true})
+}
+
+func (handler *AuthHandler) DisableTOTP(ginContext *gin.Context) {
+	var requestPayload TOTPCodeRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	currentUser, exists := ginContext.Get("user")
+	if !exists {
+		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized access"})
+		return
+	}
+	userEntity := currentUser.(*domain.User)
+
+	if err := handler.authUseCase.DisableTOTP(ginContext.Request.Context(), userEntity.ID, requestPayload.Code); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"message": "totp disabled", "totp_enabled": false})
+}
+
+func (handler *AuthHandler) GetTOTPStatus(ginContext *gin.Context) {
+	currentUser, exists := ginContext.Get("user")
+	if !exists {
+		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized access"})
+		return
+	}
+	userEntity := currentUser.(*domain.User)
+
+	enabled, err := handler.authUseCase.GetTOTPStatus(ginContext.Request.Context(), userEntity.ID)
+	if err != nil {
+		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"totp_enabled": enabled})
 }

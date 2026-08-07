@@ -36,6 +36,11 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 				authGroup.POST("/register", CSRFMiddleware(true), authHandler.Register)
 			}
 			authGroup.POST("/login", CSRFMiddleware(true), authHandler.Login)
+			authGroup.POST("/login/totp", CSRFMiddleware(true), authHandler.CompleteLoginWithTOTP)
+			authGroup.GET("/mfa/status", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.GetTOTPStatus)
+			authGroup.POST("/mfa/setup", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.GenerateTOTP)
+			authGroup.POST("/mfa/enable", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.EnableTOTP)
+			authGroup.POST("/mfa/disable", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.DisableTOTP)
 			authGroup.POST("/refresh", CSRFMiddleware(true), authHandler.Refresh)
 			authGroup.POST("/logout", CSRFMiddleware(true), authHandler.Logout)
 			authGroup.POST("/logout-everywhere", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.LogoutEverywhere)

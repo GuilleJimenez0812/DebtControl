@@ -95,3 +95,22 @@ func TestRevokeAllUserSessionsRevokesEveryFamily(t *testing.T) {
 	assert.Empty(t, store.SnapshotFamiliesForUser("user-1"))
 	assert.Len(t, store.SnapshotFamiliesForUser("user-2"), 1)
 }
+
+func TestMFAChallengeIsSingleUse(t *testing.T) {
+	store := newTestStore()
+	ticket := "ticket-abc"
+	require.NoError(t, store.StoreMFAChallenge(context.Background(), ticket, "user-1", 5*time.Minute))
+
+	userID, err := store.ConsumeMFAChallenge(context.Background(), ticket)
+	require.NoError(t, err)
+	assert.Equal(t, "user-1", userID)
+
+	_, err = store.ConsumeMFAChallenge(context.Background(), ticket)
+	assert.Error(t, err)
+}
+
+func TestMFAChallengeUnknownTicketRejected(t *testing.T) {
+	store := newTestStore()
+	_, err := store.ConsumeMFAChallenge(context.Background(), "does-not-exist")
+	assert.Error(t, err)
+}

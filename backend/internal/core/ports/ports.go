@@ -10,6 +10,7 @@ import (
 
 type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
+	Update(ctx context.Context, user *domain.User) error
 	FindByEmail(ctx context.Context, email string) (*domain.User, error)
 	FindByID(ctx context.Context, id string) (*domain.User, error)
 	FindAll(ctx context.Context) ([]*domain.User, error)
@@ -73,6 +74,13 @@ type SessionStore interface {
 	RevokeSession(ctx context.Context, presentedToken string) error
 	// RevokeAllUserSessions revokes every refresh session family of the user (logout-everywhere).
 	RevokeAllUserSessions(ctx context.Context, userID string) error
+
+	// StoreMFAChallenge records a short-lived, single-use MFA login ticket for
+	// the user (used to bridge a verified password to a completed login).
+	StoreMFAChallenge(ctx context.Context, ticket string, userID string, expiration time.Duration) error
+	// ConsumeMFAChallenge atomically redeems the ticket once, returning the
+	// user id. Redeeming an already-spent ticket returns an error.
+	ConsumeMFAChallenge(ctx context.Context, ticket string) (string, error)
 }
 
 // ErrRefreshReuse signals a previously rotated refresh token was presented again.
@@ -80,11 +88,28 @@ var ErrRefreshReuse = errors.New("refresh token reuse detected, session revoked"
 
 type AuthUseCase interface {
 	Register(ctx context.Context, email string, password string, fullName string) (*domain.User, error)
-	Login(ctx context.Context, email string, password string) (accessToken string, refreshToken string, user *domain.User, err error)
+	Login(ctx context.Context, email string, password string) (*LoginResult, error)
+	CompleteLoginWithTOTP(ctx context.Context, ticket string, presentedCode string) (*LoginResult, error)
 	Refresh(ctx context.Context, presentedRefreshToken string) (accessToken string, newRefreshToken string, user *domain.User, err error)
 	Logout(ctx context.Context, tokenID string, refreshToken string) error
 	LogoutEverywhere(ctx context.Context, userID string) error
 	ValidateAccessToken(ctx context.Context, tokenString string) (*domain.User, string, error)
+
+	GenerateTOTP(ctx context.Context, userID string) (secret string, provisioningURI string, err error)
+	EnableTOTP(ctx context.Context, userID string, presentedCode string) error
+	DisableTOTP(ctx context.Context, userID string, presentedCode string) error
+	GetTOTPStatus(ctx context.Context, userID string) (enabled bool, err error)
+}
+
+// LoginResult captures a successful password check. When MFA is required the
+// service does not yet issue tokens; it returns a short-lived, single-use
+// challenge that the client must redeem with a verified TOTP code.
+type LoginResult struct {
+	User            *domain.User
+	AccessToken     string
+	RefreshToken    string
+	MFAPendingLogin bool
+	MFATicket       string
 }
 
 type UserWithPersons struct {
@@ -100,11 +125,11 @@ type AdminUseCase interface {
 }
 
 type DashboardSummary struct {
-	TotalOutstanding float64                  `json:"total_outstanding"`
-	TotalJuly26      float64                  `json:"total_july_26"`
-	TotalAugust26    float64                  `json:"total_august_26"`
-	Persons          []*domain.Person         `json:"persons"`
-	RecentPurchases  []*domain.PurchaseItem   `json:"recent_purchases"`
+	TotalOutstanding float64                   `json:"total_outstanding"`
+	TotalJuly26      float64                   `json:"total_july_26"`
+	TotalAugust26    float64                   `json:"total_august_26"`
+	Persons          []*domain.Person          `json:"persons"`
+	RecentPurchases  []*domain.PurchaseItem    `json:"recent_purchases"`
 	ShippingPackages []*domain.ShippingPackage `json:"shipping_packages"`
 }
 

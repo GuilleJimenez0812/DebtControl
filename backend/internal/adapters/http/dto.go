@@ -11,6 +11,15 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type MFALoginRequest struct {
+	MFATicket string `json:"mfa_ticket" binding:"required"`
+	Code      string `json:"code" binding:"required,len=6"`
+}
+
+type TOTPCodeRequest struct {
+	Code string `json:"code" binding:"required,len=6"`
+}
+
 type CreatePurchaseRequest struct {
 	PersonName   string  `json:"person_name" binding:"required"`
 	OrderNumber  string  `json:"order_number"`

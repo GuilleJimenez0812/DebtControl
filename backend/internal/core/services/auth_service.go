@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"time"
 
@@ -13,9 +15,20 @@ import (
 )
 
 var (
-	ErrUserAlreadyExists = errors.New("user with this email already exists")
+	ErrUserAlreadyExists  = errors.New("user with this email already exists")
 	ErrInvalidCredentials = errors.New("invalid email or password")
+	ErrUserNotFound       = errors.New("user not found")
+	ErrTOTPNotProvisioned = errors.New("TOTP not provisioned")
+	ErrInvalidTOTPCode    = errors.New("invalid TOTP code")
 )
+
+func generateOpaqueTicket() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
 
 type AuthService struct {
 	userRepo     ports.UserRepository
@@ -62,28 +75,77 @@ func (service *AuthService) Register(ctx context.Context, email string, password
 	return newUser, nil
 }
 
-func (service *AuthService) Login(ctx context.Context, email string, password string) (accessToken string, refreshToken string, user *domain.User, err error) {
+func (service *AuthService) Login(ctx context.Context, email string, password string) (*ports.LoginResult, error) {
 	existingUser, err := service.userRepo.FindByEmail(ctx, email)
 	if err != nil || existingUser == nil {
-		return "", "", nil, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 
 	err = security.ComparePassword(existingUser.PasswordHash, password)
 	if err != nil {
-		return "", "", nil, ErrInvalidCredentials
+		return nil, ErrInvalidCredentials
 	}
 
-	accessToken, tokenID, err := security.GenerateAccessToken(existingUser.ID, existingUser.Email, string(existingUser.Role), service.jwtSecret, 15*time.Minute)
+	result := &ports.LoginResult{User: existingUser}
+
+	// MFA gate: verify the password, but only issue tokens after the user
+	// proves possession of their authenticator with a TOTP code.
+	if existingUser.TOTPEnabled {
+		ticket, err := generateOpaqueTicket()
+		if err != nil {
+			return nil, err
+		}
+		if service.sessionStore != nil {
+			if err := service.sessionStore.StoreMFAChallenge(ctx, ticket, existingUser.ID, 5*time.Minute); err != nil {
+				return nil, err
+			}
+		}
+		result.MFAPendingLogin = true
+		result.MFATicket = ticket
+		return result, nil
+	}
+
+	return result, service.issueSession(ctx, result, existingUser)
+}
+
+// CompleteLoginWithTOTP redeems the single-use MFA ticket from a successful
+// password check and, once the presented TOTP code is valid, issues the real
+// session.
+func (service *AuthService) CompleteLoginWithTOTP(ctx context.Context, ticket string, presentedCode string) (*ports.LoginResult, error) {
+	if service.sessionStore == nil {
+		return nil, errors.New("session store not configured")
+	}
+
+	userID, err := service.sessionStore.ConsumeMFAChallenge(ctx, ticket)
 	if err != nil {
-		return "", "", nil, err
+		return nil, ErrInvalidCredentials
+	}
+
+	existingUser, err := service.userRepo.FindByID(ctx, userID)
+	if err != nil || existingUser == nil {
+		return nil, ErrInvalidCredentials
+	}
+	if !existingUser.TOTPEnabled || !security.ValidateTOTP(existingUser.TOTPSecret, presentedCode) {
+		return nil, ErrInvalidCredentials
+	}
+
+	result := &ports.LoginResult{User: existingUser}
+	return result, service.issueSession(ctx, result, existingUser)
+}
+
+func (service *AuthService) issueSession(ctx context.Context, result *ports.LoginResult, user *domain.User) error {
+	accessToken, tokenID, err := security.GenerateAccessToken(user.ID, user.Email, string(user.Role), service.jwtSecret, 15*time.Minute)
+	if err != nil {
+		return err
 	}
 
 	if service.sessionStore != nil {
-		_ = service.sessionStore.StoreSession(ctx, existingUser.ID, tokenID, 15*time.Minute)
-		refreshToken, _, _ = service.sessionStore.CreateRefreshSession(ctx, existingUser.ID, 7*24*time.Hour)
+		_ = service.sessionStore.StoreSession(ctx, user.ID, tokenID, 15*time.Minute)
+		refreshToken, _, _ := service.sessionStore.CreateRefreshSession(ctx, user.ID, 7*24*time.Hour)
+		result.RefreshToken = refreshToken
 	}
-
-	return accessToken, refreshToken, existingUser, nil
+	result.AccessToken = accessToken
+	return nil
 }
 
 // Refresh validates the presented opaque refresh token, rotates it (remote family
@@ -152,4 +214,66 @@ func (service *AuthService) ValidateAccessToken(ctx context.Context, tokenString
 	}
 
 	return user, claims.TokenID, nil
+}
+
+func (service *AuthService) GetTOTPStatus(ctx context.Context, userID string) (bool, error) {
+	user, err := service.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, ErrUserNotFound
+	}
+	return user.TOTPEnabled, nil
+}
+
+// GenerateTOTP creates a fresh secret and stores it (encrypted at rest) so the
+// user can scan the QR. The secret only takes effect once a valid code proves
+// possession; until then the account keeps working without MFA.
+func (service *AuthService) GenerateTOTP(ctx context.Context, userID string) (string, string, error) {
+	user, err := service.userRepo.FindByID(ctx, userID)
+	if err != nil || user == nil {
+		return "", "", ErrUserNotFound
+	}
+
+	secret, provisioningURI, err := security.GenerateTOTPSecret("DebtControl", user.Email)
+	if err != nil {
+		return "", "", err
+	}
+
+	user.TOTPSecret = secret
+	if err := service.userRepo.Update(ctx, user); err != nil {
+		return "", "", err
+	}
+
+	return secret, provisioningURI, nil
+}
+
+func (service *AuthService) EnableTOTP(ctx context.Context, userID string, presentedCode string) error {
+	user, err := service.userRepo.FindByID(ctx, userID)
+	if err != nil || user == nil {
+		return ErrUserNotFound
+	}
+	if user.TOTPSecret == "" {
+		return ErrTOTPNotProvisioned
+	}
+	if !security.ValidateTOTP(user.TOTPSecret, presentedCode) {
+		return ErrInvalidTOTPCode
+	}
+
+	user.EnableTOTP()
+	return service.userRepo.Update(ctx, user)
+}
+
+func (service *AuthService) DisableTOTP(ctx context.Context, userID string, presentedCode string) error {
+	user, err := service.userRepo.FindByID(ctx, userID)
+	if err != nil || user == nil {
+		return ErrUserNotFound
+	}
+	if !security.ValidateTOTP(user.TOTPSecret, presentedCode) {
+		return ErrInvalidTOTPCode
+	}
+
+	user.DisableTOTP()
+	return service.userRepo.Update(ctx, user)
 }

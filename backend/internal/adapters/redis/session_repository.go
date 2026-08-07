@@ -131,7 +131,7 @@ func (repository *SessionRepository) RefreshSession(ctx context.Context, present
 	}
 
 	var (
-		userID  string
+		userID   string
 		newToken string
 	)
 	familyKey := repository.refreshFamilyKey(familyID)
@@ -274,6 +274,33 @@ func (repository *SessionRepository) RevokeAllUserSessions(ctx context.Context, 
 	return nil
 }
 
+func (repository *SessionRepository) mfaTicketKey(ticket string) string {
+	return "mfa:ticket:" + ticket
+}
+
+func (repository *SessionRepository) StoreMFAChallenge(ctx context.Context, ticket string, userID string, expiration time.Duration) error {
+	if repository.redisClient == nil {
+		return errors.New("redis session store not configured")
+	}
+	return repository.redisClient.Set(ctx, repository.mfaTicketKey(ticket), userID, expiration).Err()
+}
+
+// ConsumeMFAChallenge atomically redeems the single-use ticket. GETDEL makes
+// replayed tickets impossible: the second redemption sees no value.
+func (repository *SessionRepository) ConsumeMFAChallenge(ctx context.Context, ticket string) (string, error) {
+	if repository.redisClient == nil {
+		return "", errors.New("redis session store not configured")
+	}
+	userID, err := repository.redisClient.GetDel(ctx, repository.mfaTicketKey(ticket)).Result()
+	if err == redis.Nil {
+		return "", errors.New("invalid or expired MFA ticket")
+	}
+	if err != nil {
+		return "", err
+	}
+	return userID, nil
+}
+
 // --- In-memory SessionRepository (fallback + tests) --------------------------------
 
 type MemorySessionRepository struct {
@@ -281,6 +308,7 @@ type MemorySessionRepository struct {
 	blacklist     map[string]time.Time
 	families      map[string]*refreshFamily // familyID -> family
 	tokenToFamily map[string]string         // tokenHash -> familyID
+	mfaTickets    map[string]string         // ticket -> userID (single-use)
 }
 
 func NewMemorySessionRepository() *MemorySessionRepository {
@@ -288,7 +316,28 @@ func NewMemorySessionRepository() *MemorySessionRepository {
 		blacklist:     make(map[string]time.Time),
 		families:      make(map[string]*refreshFamily),
 		tokenToFamily: make(map[string]string),
+		mfaTickets:    make(map[string]string),
 	}
+}
+
+func (repo *MemorySessionRepository) StoreMFAChallenge(ctx context.Context, ticket string, userID string, expiration time.Duration) error {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+
+	repo.mfaTickets[ticket] = userID
+	return nil
+}
+
+func (repo *MemorySessionRepository) ConsumeMFAChallenge(ctx context.Context, ticket string) (string, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+
+	userID, exists := repo.mfaTickets[ticket]
+	if !exists {
+		return "", errors.New("invalid or expired MFA ticket")
+	}
+	delete(repo.mfaTickets, ticket)
+	return userID, nil
 }
 
 func (repo *MemorySessionRepository) StoreSession(ctx context.Context, userID string, tokenID string, expiration time.Duration) error {

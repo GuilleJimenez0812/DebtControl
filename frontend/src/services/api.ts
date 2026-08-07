@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DashboardSummary, User, PurchaseItem, ShippingPackage, Person } from '../types';
+import type { DashboardSummary, User, PurchaseItem, ShippingPackage, Person, LoginResult } from '../types';
 
 const apiClient = axios.create({
   baseURL: '/api/v1',
@@ -76,8 +76,33 @@ export const apiService = {
     return response.data;
   },
 
-  login: async (email: string, password: string) => {
-    const response = await apiClient.post('/auth/login', { email, password });
+  login: async (email: string, password: string): Promise<LoginResult> => {
+    const response = await apiClient.post<LoginResult>('/auth/login', { email, password });
+    return response.data;
+  },
+
+  completeLoginWithTOTP: async (mfaTicket: string, code: string): Promise<LoginResult> => {
+    const response = await apiClient.post<LoginResult>('/auth/login/totp', { mfa_ticket: mfaTicket, code });
+    return response.data;
+  },
+
+  getTOTPStatus: async (): Promise<{ totp_enabled: boolean }> => {
+    const response = await apiClient.get('/auth/mfa/status');
+    return response.data;
+  },
+
+  setupTOTP: async (): Promise<{ secret: string; provisioning_uri: string }> => {
+    const response = await apiClient.post('/auth/mfa/setup');
+    return response.data;
+  },
+
+  enableTOTP: async (code: string): Promise<{ totp_enabled: boolean }> => {
+    const response = await apiClient.post('/auth/mfa/enable', { code });
+    return response.data;
+  },
+
+  disableTOTP: async (code: string): Promise<{ totp_enabled: boolean }> => {
+    const response = await apiClient.post('/auth/mfa/disable', { code });
     return response.data;
   },
 
