@@ -8,6 +8,8 @@ services:
     plan: free
     region: oregon
     envVars:
+      - key: APP_ENV
+        value: production
       - key: PORT
         value: 8080
       - key: JWT_SECRET

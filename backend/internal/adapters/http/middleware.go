@@ -141,6 +141,12 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		ginContext.Header("X-Content-Type-Options", "nosniff")
 		ginContext.Header("X-XSS-Protection", "1; mode=block")
 		ginContext.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		// HSTS forces browsers to only use HTTPS for the domain after the first
+		// visit. Sent unconditionally for simplicity; it is only honored over
+		// HTTPS, which Render always terminates.
+		ginContext.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		// Deny browser features this app never uses (unnecessary attack surface).
+		ginContext.Header("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
 		ginContext.Next()
 	}
 }

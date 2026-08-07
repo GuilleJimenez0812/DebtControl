@@ -192,6 +192,27 @@ func TestTurnstileSkippedWhenSecretEmpty(t *testing.T) {
 	assert.NotEqual(t, http.StatusForbidden, response.Code)
 }
 
+func TestSecurityHeadersPresentOnEveryResponse(t *testing.T) {
+	router := newTestRouter(httpAdapter.SecurityOptions{})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/auth/registration-status", nil)
+	request.RemoteAddr = "203.0.113.10:1234"
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	expected := map[string]string{
+		"X-Frame-Options":           "DENY",
+		"X-Content-Type-Options":    "nosniff",
+		"X-XSS-Protection":          "1; mode=block",
+		"Referrer-Policy":           "strict-origin-when-cross-origin",
+		"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+		"Permissions-Policy":        "geolocation=(), camera=(), microphone=()",
+	}
+	for header, want := range expected {
+		assert.Equal(t, want, response.Header().Get(header), "header %s", header)
+	}
+}
+
 var errLoginFailed = &testHTTPErr{"invalid email or password"}
 
 type testHTTPErr struct{ msg string }

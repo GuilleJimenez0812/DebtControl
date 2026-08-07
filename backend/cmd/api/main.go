@@ -15,6 +15,7 @@ import (
 	"debtcontrol/backend/internal/core/ports"
 	"debtcontrol/backend/internal/core/services"
 	"debtcontrol/backend/pkg/ratelimit"
+	"debtcontrol/backend/pkg/secrets"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
@@ -42,12 +43,21 @@ func getEnvBoolOrDefault(envKey string, defaultValue bool) bool {
 	return parsed
 }
 
+// getAppEnv returns the deployment environment, defaulting to development.
+// Non-development environments (production, staging, preview, ...) enforce
+// strict startup: secrets must be supplied or the process aborts.
+func getAppEnv() string {
+	return getEnvOrDefault("APP_ENV", secrets.EnvDevelopment)
+}
+
 func main() {
 	log.Println("Starting DebtControl Backend API...")
 
-	encryptionKey := getEnvOrDefault("ENCRYPTION_KEY", "insecure-dev-encryption-key")
-	if os.Getenv("ENCRYPTION_KEY") == "" {
-		log.Println("WARNING: ENCRYPTION_KEY is not set; using an insecure development default. Set it in production.")
+	appEnv := getAppEnv()
+
+	encryptionKey, err := secrets.Resolve("ENCRYPTION_KEY", appEnv, "insecure-dev-encryption-key")
+	if err != nil {
+		log.Fatalf("FATAL: %v", err)
 	}
 	if err := postgresAdapter.SetupEncryption(encryptionKey); err != nil {
 		log.Fatalf("Failed to configure field encryption: %v", err)
@@ -121,7 +131,10 @@ func main() {
 
 	auditRepository := postgresAdapter.NewAuditRepository(databaseConnection)
 
-	jwtSecret := getEnvOrDefault("JWT_SECRET", "super-secret-debtcontrol-jwt-key-2026")
+	jwtSecret, err := secrets.Resolve("JWT_SECRET", appEnv, "super-secret-debtcontrol-jwt-key-2026")
+	if err != nil {
+		log.Fatalf("FATAL: %v", err)
+	}
 	authService := services.NewAuthService(userRepository, sessionRepository, jwtSecret)
 	debtService := services.NewDebtService(debtRepository, auditRepository, userRepository, orderSearcher)
 	adminService := services.NewAdminService(userRepository, debtRepository)
