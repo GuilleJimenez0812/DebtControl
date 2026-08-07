@@ -5,13 +5,18 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	httpAdapter "debtcontrol/backend/internal/adapters/http"
+	emailAdapter "debtcontrol/backend/internal/adapters/email"
 	postgresAdapter "debtcontrol/backend/internal/adapters/postgres"
 	redisAdapter "debtcontrol/backend/internal/adapters/redis"
 	"debtcontrol/backend/internal/core/ports"
 	"debtcontrol/backend/internal/core/services"
+	"debtcontrol/backend/pkg/ratelimit"
+	"debtcontrol/backend/pkg/secrets"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
@@ -26,12 +31,34 @@ func getEnvOrDefault(envKey string, defaultValue string) string {
 	return value
 }
 
+func getEnvBoolOrDefault(envKey string, defaultValue bool) bool {
+	raw := os.Getenv(envKey)
+	if raw == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		log.Printf("WARNING: %s has an invalid boolean value; using default %t", envKey, defaultValue)
+		return defaultValue
+	}
+	return parsed
+}
+
+// getAppEnv returns the deployment environment, defaulting to development.
+// Non-development environments (production, staging, preview, ...) enforce
+// strict startup: secrets must be supplied or the process aborts.
+func getAppEnv() string {
+	return getEnvOrDefault("APP_ENV", secrets.EnvDevelopment)
+}
+
 func main() {
 	log.Println("Starting DebtControl Backend API...")
 
-	encryptionKey := getEnvOrDefault("ENCRYPTION_KEY", "insecure-dev-encryption-key")
-	if os.Getenv("ENCRYPTION_KEY") == "" {
-		log.Println("WARNING: ENCRYPTION_KEY is not set; using an insecure development default. Set it in production.")
+	appEnv := getAppEnv()
+
+	encryptionKey, err := secrets.Resolve("ENCRYPTION_KEY", appEnv, "insecure-dev-encryption-key")
+	if err != nil {
+		log.Fatalf("FATAL: %v", err)
 	}
 	if err := postgresAdapter.SetupEncryption(encryptionKey); err != nil {
 		log.Fatalf("Failed to configure field encryption: %v", err)
@@ -87,12 +114,13 @@ func main() {
 	_ = debtRepository.EnsurePurchaseItemForeignKey(ctx)
 
 	var sessionRepository ports.SessionStore
+	var redisClient *redis.Client
 	redisHost := os.Getenv("REDIS_HOST")
 	redisEnabled := getEnvOrDefault("REDIS_ENABLED", "false")
 
 	if redisEnabled == "true" && redisHost != "" {
 		redisPort := getEnvOrDefault("REDIS_PORT", "6379")
-		redisClient := redis.NewClient(&redis.Options{
+		redisClient = redis.NewClient(&redis.Options{
 			Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
 		})
 		sessionRepository = redisAdapter.NewSessionRepository(redisClient)
@@ -104,18 +132,53 @@ func main() {
 
 	auditRepository := postgresAdapter.NewAuditRepository(databaseConnection)
 
-	jwtSecret := getEnvOrDefault("JWT_SECRET", "super-secret-debtcontrol-jwt-key-2026")
-	authService := services.NewAuthService(userRepository, sessionRepository, jwtSecret)
+	jwtSecret, err := secrets.Resolve("JWT_SECRET", appEnv, "super-secret-debtcontrol-jwt-key-2026")
+	if err != nil {
+		log.Fatalf("FATAL: %v", err)
+	}
+	emailSender := emailAdapter.NewResendSender(getEnvOrDefault("EMAIL_FROM", "DebtControl <otp@mail.yourdomain.com>"))
+	authService := services.NewAuthService(userRepository, sessionRepository, emailSender, jwtSecret)
 	debtService := services.NewDebtService(debtRepository, auditRepository, userRepository, orderSearcher)
 	adminService := services.NewAdminService(userRepository, debtRepository)
 
 	_ = debtService.SeedInitialSpreadsheetData(ctx)
 
+	var rateLimitStore ratelimit.Store = ratelimit.NewMemoryStore()
+	if redisClient != nil {
+		rateLimitStore = ratelimit.NewRedisStore(redisClient)
+	}
+	rateLimiter := ratelimit.NewLimiter(rateLimitStore)
+
+	securityOptions := httpAdapter.SecurityOptions{
+		RateLimiter:     rateLimiter,
+		TurnstileSecret: getEnvOrDefault("TURNSTILE_SECRET", ""),
+		// Login: per IP+account, 5 per 15 minutes (credential stuffing resistant).
+		LoginPolicies: []ratelimit.Policy{
+			{Limit: 5, Window: 15 * time.Minute},
+		},
+		// Register: per IP, 10 per 24h (closed by default; generous ceiling for admins).
+		RegisterPolicies: []ratelimit.Policy{
+			{Limit: 10, Window: 24 * time.Hour},
+		},
+		// Global API throttle: per IP, 300 per minute protects against abusive traffic.
+		GlobalPolicies: []ratelimit.Policy{
+			{Limit: 300, Window: time.Minute},
+		},
+		// Forgot-password: per IP, 3 per 15 minutes (OTP mailbox flooding).
+		ResetRequestPolicies: []ratelimit.Policy{
+			{Limit: 3, Window: 15 * time.Minute},
+		},
+		// OTP/ticket verification: per IP, 10 per 15 minutes (code guessing).
+		ResetVerifyPolicies: []ratelimit.Policy{
+			{Limit: 10, Window: 15 * time.Minute},
+		},
+	}
+
 	allowedOrigins := strings.Split(getEnvOrDefault(
 		"ALLOWED_ORIGINS",
 		"http://localhost:5173,http://localhost:3000,https://debtcontrol-1.onrender.com",
 	), ",")
-	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, allowedOrigins)
+	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, allowedOrigins, getEnvBoolOrDefault("REGISTRATION_ENABLED", false), securityOptions)
 
 	serverPort := getEnvOrDefault("PORT", "8080")
 	log.Printf("Server listening on http://localhost:%s", serverPort)

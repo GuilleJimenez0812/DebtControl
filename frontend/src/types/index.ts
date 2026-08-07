@@ -5,8 +5,17 @@ export interface User {
   email: string;
   full_name: string;
   role: string;
+  totp_enabled: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface LoginResult {
+  message?: string;
+  user?: User;
+  mfa_pending?: boolean;
+  mfa_ticket?: string;
+  totp_required?: boolean;
 }
 
 export interface Person {

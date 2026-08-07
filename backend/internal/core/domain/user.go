@@ -7,7 +7,6 @@ import (
 
 var (
 	ErrInvalidEmail      = errors.New("invalid email address")
-	ErrPasswordTooShort   = errors.New("password must be at least 8 characters")
 	ErrUserAlreadyExists = errors.New("user with this email already exists")
 	ErrUserNotFound      = errors.New("user not found")
 )
@@ -26,8 +25,21 @@ type User struct {
 	PasswordHash string    `json:"-"`
 	FullName     string    `json:"full_name"`
 	Role         UserRole  `json:"role"`
+	TOTPSecret   string    `json:"-"`
+	TOTPEnabled  bool      `json:"totp_enabled"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+func (user *User) EnableTOTP() {
+	user.TOTPEnabled = true
+	user.UpdatedAt = time.Now()
+}
+
+func (user *User) DisableTOTP() {
+	user.TOTPEnabled = false
+	user.TOTPSecret = ""
+	user.UpdatedAt = time.Now()
 }
 
 func NewUser(id string, email string, passwordHash string, fullName string, role UserRole) (*User, error) {

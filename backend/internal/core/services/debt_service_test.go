@@ -187,6 +187,7 @@ func (fake *fakeAuditRepository) GetAuditLogs(_ context.Context, _ int, _ int) (
 type fakeUserRepository struct{}
 
 func (fake *fakeUserRepository) Create(_ context.Context, _ *domain.User) error { return nil }
+func (fake *fakeUserRepository) Update(_ context.Context, _ *domain.User) error { return nil }
 func (fake *fakeUserRepository) FindByEmail(_ context.Context, _ string) (*domain.User, error) {
 	return nil, nil
 }

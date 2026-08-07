@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DashboardSummary, User, PurchaseItem, ShippingPackage, Person } from '../types';
+import type { DashboardSummary, User, PurchaseItem, ShippingPackage, Person, LoginResult } from '../types';
 
 const apiClient = axios.create({
   baseURL: '/api/v1',
@@ -8,6 +8,44 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// A short-lived token stored in memory; on each successful auth flow it is
+// refreshed from the HttpOnly cookie response. The cookie itself is the
+// source of truth for the session.
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Echo the non-HttpOnly double-submit CSRF cookie on every mutation.
+apiClient.interceptors.request.use((config) => {
+  const csrf = readCookie('csrf_token');
+  if (csrf) {
+    config.headers['X-CSRF-Token'] = csrf;
+  }
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config as any;
+    if (error.response?.status === 401 && !original?._retried) {
+      original._retried = true;
+      try {
+        const csrf = readCookie('csrf_token') ?? '';
+        await axios.post('/api/v1/auth/refresh', {}, {
+          withCredentials: true,
+          headers: { 'X-CSRF-Token': csrf },
+        });
+        return apiClient(original);
+      } catch {
+        // refresh failed; fall through to surface the original 401
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export interface UserWithPersons {
   user: User;
@@ -28,21 +66,82 @@ export interface ParseInvoiceResult {
 
 export const apiService = {
   // Auth
-  register: async (email: string, password: string, fullName: string) => {
-    const response = await apiClient.post('/auth/register', { email, password, full_name: fullName });
+  getRegistrationStatus: async (): Promise<{ registration_enabled: boolean }> => {
+    const response = await apiClient.get('/auth/registration-status');
     return response.data;
   },
 
-  login: async (email: string, password: string) => {
-    const response = await apiClient.post<{ user: User; access_token: string }>('/auth/login', { email, password });
-    if (response.data.access_token) {
-      apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
-    }
+  register: async (email: string, password: string, fullName: string, turnstileToken?: string) => {
+    const response = await apiClient.post('/auth/register', { email, password, full_name: fullName, turnstile_token: turnstileToken ?? '' });
+    return response.data;
+  },
+
+  login: async (email: string, password: string, turnstileToken?: string): Promise<LoginResult> => {
+    const response = await apiClient.post<LoginResult>('/auth/login', { email, password, turnstile_token: turnstileToken ?? '' });
+    return response.data;
+  },
+
+  completeLoginWithTOTP: async (mfaTicket: string, code: string): Promise<LoginResult> => {
+    const response = await apiClient.post<LoginResult>('/auth/login/totp', { mfa_ticket: mfaTicket, code });
+    return response.data;
+  },
+
+  getTOTPStatus: async (): Promise<{ totp_enabled: boolean }> => {
+    const response = await apiClient.get('/auth/mfa/status');
+    return response.data;
+  },
+
+  setupTOTP: async (): Promise<{ secret: string; provisioning_uri: string }> => {
+    const response = await apiClient.post('/auth/mfa/setup');
+    return response.data;
+  },
+
+  enableTOTP: async (code: string): Promise<{ totp_enabled: boolean }> => {
+    const response = await apiClient.post('/auth/mfa/enable', { code });
+    return response.data;
+  },
+
+  disableTOTP: async (code: string): Promise<{ totp_enabled: boolean }> => {
+    const response = await apiClient.post('/auth/mfa/disable', { code });
     return response.data;
   },
 
   logout: async () => {
     const response = await apiClient.post('/auth/logout');
+    delete apiClient.defaults.headers.common['Authorization'];
+    return response.data;
+  },
+
+  logoutEverywhere: async () => {
+    const response = await apiClient.post('/auth/logout-everywhere');
+    delete apiClient.defaults.headers.common['Authorization'];
+    return response.data;
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    const response = await apiClient.post('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    delete apiClient.defaults.headers.common['Authorization'];
+    return response.data;
+  },
+
+  requestPasswordReset: async (email: string) => {
+    const response = await apiClient.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  verifyResetOTP: async (email: string, code: string): Promise<{ reset_ticket: string }> => {
+    const response = await apiClient.post('/auth/verify-reset-otp', { email, code });
+    return response.data;
+  },
+
+  resetPassword: async (resetTicket: string, newPassword: string) => {
+    const response = await apiClient.post('/auth/reset-password', {
+      reset_ticket: resetTicket,
+      new_password: newPassword,
+    });
     delete apiClient.defaults.headers.common['Authorization'];
     return response.data;
   },
