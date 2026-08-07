@@ -2,7 +2,7 @@ package http
 
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Password string `json:"password" binding:"required,min=12"`
 	FullName string `json:"full_name" binding:"required"`
 }
 
@@ -18,6 +18,11 @@ type MFALoginRequest struct {
 
 type TOTPCodeRequest struct {
 	Code string `json:"code" binding:"required,len=6"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=12"`
 }
 
 type CreatePurchaseRequest struct {

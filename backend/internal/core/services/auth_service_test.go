@@ -333,3 +333,47 @@ func TestDisableTOTPRequiresValidCode(t *testing.T) {
 	assert.False(t, stored.TOTPEnabled)
 	assert.Empty(t, stored.TOTPSecret)
 }
+
+func TestChangePasswordUpdatesHashAndRevokesOtherSessions(t *testing.T) {
+	svc, repo, sessions := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "a@b.com", "old-password-123")
+
+	err := svc.ChangePassword(context.Background(), "user-1", "old-password-123", "new-password-456")
+	require.NoError(t, err)
+
+	stored, _ := repo.FindByID(context.Background(), "user-1")
+	assert.NoError(t, security.ComparePassword(stored.PasswordHash, "new-password-456"))
+	// The current credential no longer authenticates.
+	assert.Error(t, security.ComparePassword(stored.PasswordHash, "old-password-123"))
+	// All other sessions of the user are revoked after a password change.
+	assert.True(t, sessions.revokedAll["user-1"])
+}
+
+func TestChangePasswordRejectsWrongCurrentPassword(t *testing.T) {
+	svc, repo, sessions := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "a@b.com", "old-password-123")
+
+	err := svc.ChangePassword(context.Background(), "user-1", "not-the-current-one", "new-password-456")
+	assert.ErrorIs(t, err, services.ErrInvalidCredentials)
+
+	stored, _ := repo.FindByID(context.Background(), "user-1")
+	assert.NoError(t, security.ComparePassword(stored.PasswordHash, "old-password-123"))
+	assert.False(t, sessions.revokedAll["user-1"])
+}
+
+func TestChangePasswordRejectsWeakPolicy(t *testing.T) {
+	svc, repo, _ := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "a@b.com", "old-password-123")
+
+	err := svc.ChangePassword(context.Background(), "user-1", "old-password-123", "short")
+	assert.ErrorIs(t, err, security.ErrPasswordTooShort)
+
+	stored, _ := repo.FindByID(context.Background(), "user-1")
+	assert.NoError(t, security.ComparePassword(stored.PasswordHash, "old-password-123"))
+}
+
+func TestChangePasswordRejectsUnknownUser(t *testing.T) {
+	svc, _, _ := newTestAuthService()
+	err := svc.ChangePassword(context.Background(), "nobody", "old-password-123", "new-password-456")
+	assert.ErrorIs(t, err, services.ErrUserNotFound)
+}

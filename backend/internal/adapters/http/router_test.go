@@ -45,6 +45,9 @@ func (s *stubAuth) GenerateTOTP(ctx context.Context, userID string) (string, str
 func (s *stubAuth) EnableTOTP(ctx context.Context, userID, code string) error      { return nil }
 func (s *stubAuth) DisableTOTP(ctx context.Context, userID, code string) error     { return nil }
 func (s *stubAuth) GetTOTPStatus(ctx context.Context, userID string) (bool, error) { return false, nil }
+func (s *stubAuth) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	return nil
+}
 
 var _ ports.AuthUseCase = (*stubAuth)(nil)
 
@@ -211,6 +214,20 @@ func TestSecurityHeadersPresentOnEveryResponse(t *testing.T) {
 	for header, want := range expected {
 		assert.Equal(t, want, response.Header().Get(header), "header %s", header)
 	}
+}
+
+func TestChangePasswordRequiresAuthentication(t *testing.T) {
+	router := newTestRouter(httpAdapter.SecurityOptions{})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/change-password",
+		bytes.NewBufferString(`{"current_password":"old-1234","new_password":"new-strong-1234"}`))
+	request.Header.Set("X-CSRF-Token", "some-csrf")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	// No access token -> AuthMiddleware aborts with 401 before validating the
+	// payload, proving the route is protected.
+	assert.Equal(t, http.StatusUnauthorized, response.Code)
 }
 
 var errLoginFailed = &testHTTPErr{"invalid email or password"}

@@ -99,6 +99,10 @@ type AuthUseCase interface {
 	EnableTOTP(ctx context.Context, userID string, presentedCode string) error
 	DisableTOTP(ctx context.Context, userID string, presentedCode string) error
 	GetTOTPStatus(ctx context.Context, userID string) (enabled bool, err error)
+
+	// ChangePassword verifies the current password, applies the password policy
+	// to the new one, and revokes the user's other sessions.
+	ChangePassword(ctx context.Context, userID string, currentPassword string, newPassword string) error
 }
 
 // LoginResult captures a successful password check. When MFA is required the

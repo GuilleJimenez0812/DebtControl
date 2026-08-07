@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { User } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { CreditCard, LogIn, LogOut, ShieldCheck, Database, Globe, Sun, Moon, Users, Crown, FileUp, Menu, X, ChevronRight } from 'lucide-react';
+import { CreditCard, LogIn, LogOut, ShieldCheck, Database, Globe, Sun, Moon, Users, Crown, FileUp, Menu, X, ChevronRight, KeyRound } from 'lucide-react';
 
 interface NavbarProps {
   user: User | null;
@@ -15,6 +15,7 @@ interface NavbarProps {
   onOpenAuditLogsModal?: () => void;
   onOpenUploadInvoiceModal?: () => void;
   onOpenSecurityModal?: () => void;
+  onOpenChangePasswordModal?: () => void;
   onLogout: () => void;
   onSeedData: () => void;
   isSeeding: boolean;
@@ -31,6 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuditLogsModal,
   onOpenUploadInvoiceModal,
   onOpenSecurityModal,
+  onOpenChangePasswordModal,
   onLogout,
   onSeedData,
   isSeeding,
@@ -107,6 +109,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="hidden xl:inline">Security</span>
+              </button>
+            )}
+
+            {/* Change Password */}
+            {user && onOpenChangePasswordModal && (
+              <button
+                onClick={onOpenChangePasswordModal}
+                className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 transition"
+                title="Change Password"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden xl:inline">Password</span>
               </button>
             )}
 
@@ -265,6 +279,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   <span className="flex-1 text-left font-semibold">Security</span>
+                  <ChevronRight className="w-4 h-4 text-slate-500" />
+                </div>
+              )}
+              {user && onOpenChangePasswordModal && (
+                <div
+                  onClick={() => { onOpenChangePasswordModal(); setDrawerOpen(false); }}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <KeyRound className="w-4 h-4 text-indigo-400" />
+                  <span className="flex-1 text-left font-semibold">Change Password</span>
                   <ChevronRight className="w-4 h-4 text-slate-500" />
                 </div>
               )}

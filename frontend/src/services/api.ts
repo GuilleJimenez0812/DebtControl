@@ -118,6 +118,15 @@ export const apiService = {
     return response.data;
   },
 
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    const response = await apiClient.post('/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    delete apiClient.defaults.headers.common['Authorization'];
+    return response.data;
+  },
+
   getCurrentUser: async (): Promise<User | null> => {
     try {
       const response = await apiClient.get<{ user: User }>('/auth/me');

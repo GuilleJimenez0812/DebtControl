@@ -276,3 +276,25 @@ func (handler *AuthHandler) GetTOTPStatus(ginContext *gin.Context) {
 
 	ginContext.JSON(http.StatusOK, gin.H{"totp_enabled": enabled})
 }
+
+func (handler *AuthHandler) ChangePassword(ginContext *gin.Context) {
+	var requestPayload ChangePasswordRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	currentUser, exists := ginContext.Get("user")
+	if !exists {
+		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized access"})
+		return
+	}
+	userEntity := currentUser.(*domain.User)
+
+	if err := handler.authUseCase.ChangePassword(ginContext.Request.Context(), userEntity.ID, requestPayload.CurrentPassword, requestPayload.NewPassword); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"message": "password changed, other sessions revoked"})
+}

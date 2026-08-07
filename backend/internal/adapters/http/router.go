@@ -71,6 +71,7 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 			authGroup.POST("/refresh", CSRFMiddleware(true), authHandler.Refresh)
 			authGroup.POST("/logout", CSRFMiddleware(true), authHandler.Logout)
 			authGroup.POST("/logout-everywhere", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.LogoutEverywhere)
+			authGroup.POST("/change-password", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.ChangePassword)
 			authGroup.GET("/me", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.GetCurrentUser)
 		}
 

@@ -11,6 +11,7 @@ import { PurchasesList } from './components/PurchasesList';
 import { PurchaseDetailModal } from './components/PurchaseDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { TOTPSettingsModal } from './components/TOTPSettingsModal';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { AuthWall } from './components/AuthWall';
 import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewPaymentModal } from './components/NewPaymentModal';
@@ -54,6 +55,7 @@ const DashboardContent: React.FC = () => {
   const [isAuditLogsOpen, setIsAuditLogsOpen] = useState<boolean>(false);
   const [isUploadInvoiceOpen, setIsUploadInvoiceOpen] = useState<boolean>(false);
   const [isSecurityOpen, setIsSecurityOpen] = useState<boolean>(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
   const [previewInvoiceUrl, setPreviewInvoiceUrl] = useState<string | null>(null);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState<boolean>(false);
   const [selectedPersonForPayment, setSelectedPersonForPayment] = useState<Person | null>(null);
@@ -231,6 +233,7 @@ const DashboardContent: React.FC = () => {
         onOpenAuditLogsModal={() => setIsAuditLogsOpen(true)}
         onOpenUploadInvoiceModal={() => setIsUploadInvoiceOpen(true)}
         onOpenSecurityModal={() => setIsSecurityOpen(true)}
+        onOpenChangePasswordModal={() => setIsChangePasswordOpen(true)}
         onLogout={handleLogout}
         onSeedData={() => seedMutation.mutate()}
         isSeeding={seedMutation.isPending}
@@ -324,6 +327,11 @@ const DashboardContent: React.FC = () => {
       <TOTPSettingsModal
         isOpen={isSecurityOpen}
         onClose={() => setIsSecurityOpen(false)}
+      />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
       />
 
       <AdminUserModal

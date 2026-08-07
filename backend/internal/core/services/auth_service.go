@@ -111,6 +111,40 @@ func (service *AuthService) Login(ctx context.Context, email string, password st
 // CompleteLoginWithTOTP redeems the single-use MFA ticket from a successful
 // password check and, once the presented TOTP code is valid, issues the real
 // session.
+// ChangePassword verifies the caller's current password, applies the shared
+// password policy to the new one, persists the new bcrypt hash, and revokes
+// every other session of the user (best practice after a credential change).
+func (service *AuthService) ChangePassword(ctx context.Context, userID string, currentPassword string, newPassword string) error {
+	user, err := service.userRepo.FindByID(ctx, userID)
+	if err != nil || user == nil {
+		return ErrUserNotFound
+	}
+
+	if err := security.ComparePassword(user.PasswordHash, currentPassword); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := security.ValidatePasswordPolicy(newPassword); err != nil {
+		return err
+	}
+
+	newHash, err := security.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	user.PasswordHash = newHash
+	user.UpdatedAt = time.Now()
+	if err := service.userRepo.Update(ctx, user); err != nil {
+		return err
+	}
+
+	if service.sessionStore != nil {
+		_ = service.sessionStore.RevokeAllUserSessions(ctx, userID)
+	}
+	return nil
+}
+
 func (service *AuthService) CompleteLoginWithTOTP(ctx context.Context, ticket string, presentedCode string) (*ports.LoginResult, error) {
 	if service.sessionStore == nil {
 		return nil, errors.New("session store not configured")
