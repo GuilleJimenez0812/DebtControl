@@ -201,7 +201,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
           </div>
 
           {!isEditingPurchase ? (
-            <div className="grid grid-cols-4 gap-3 text-center border-t border-slate-800 pt-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center border-t border-slate-800 pt-3">
               <div>
                 <p className="text-xs text-slate-400">{t.itemAmount}</p>
                 <p className="text-sm font-bold font-mono text-slate-200">${purchase.item_amount.toFixed(2)}</p>
@@ -220,7 +220,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">{t.itemAmount}</label>
                 <input
