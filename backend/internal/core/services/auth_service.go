@@ -78,21 +78,57 @@ func (service *AuthService) Login(ctx context.Context, email string, password st
 		return "", "", nil, err
 	}
 
-	refreshToken, _, err = security.GenerateAccessToken(existingUser.ID, existingUser.Email, string(existingUser.Role), service.jwtSecret, 7*24*time.Hour)
-	if err != nil {
-		return "", "", nil, err
-	}
-
 	if service.sessionStore != nil {
 		_ = service.sessionStore.StoreSession(ctx, existingUser.ID, tokenID, 15*time.Minute)
+		refreshToken, _, _ = service.sessionStore.CreateRefreshSession(ctx, existingUser.ID, 7*24*time.Hour)
 	}
 
 	return accessToken, refreshToken, existingUser, nil
 }
 
-func (service *AuthService) Logout(ctx context.Context, tokenID string) error {
-	if service.sessionStore != nil && tokenID != "" {
-		return service.sessionStore.InvalidateSession(ctx, tokenID, 24*time.Hour)
+// Refresh validates the presented opaque refresh token, rotates it (remote family
+// reuse protection) and issues a fresh access token.
+func (service *AuthService) Refresh(ctx context.Context, presentedRefreshToken string) (accessToken string, newRefreshToken string, user *domain.User, err error) {
+	if service.sessionStore == nil {
+		return "", "", nil, errors.New("session store not configured")
+	}
+
+	userID, _, rotatedToken, err := service.sessionStore.RefreshSession(ctx, presentedRefreshToken, 7*24*time.Hour)
+	if err != nil {
+		if errors.Is(err, ports.ErrRefreshReuse) {
+			return "", "", nil, ports.ErrRefreshReuse
+		}
+		return "", "", nil, ErrInvalidCredentials
+	}
+
+	resolvedUser, err := service.userRepo.FindByID(ctx, userID)
+	if err != nil || resolvedUser == nil {
+		return "", "", nil, ErrInvalidCredentials
+	}
+
+	accessToken, _, err = security.GenerateAccessToken(resolvedUser.ID, resolvedUser.Email, string(resolvedUser.Role), service.jwtSecret, 15*time.Minute)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	return accessToken, rotatedToken, resolvedUser, nil
+}
+
+func (service *AuthService) Logout(ctx context.Context, tokenID string, refreshToken string) error {
+	if service.sessionStore != nil {
+		if tokenID != "" {
+			_ = service.sessionStore.InvalidateSession(ctx, tokenID, 24*time.Hour)
+		}
+		if refreshToken != "" {
+			_ = service.sessionStore.RevokeSession(ctx, refreshToken)
+		}
+	}
+	return nil
+}
+
+func (service *AuthService) LogoutEverywhere(ctx context.Context, userID string) error {
+	if service.sessionStore != nil {
+		return service.sessionStore.RevokeAllUserSessions(ctx, userID)
 	}
 	return nil
 }

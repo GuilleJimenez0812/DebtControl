@@ -29,16 +29,18 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 
 	apiGroup := routerEngine.Group("/api/v1")
 	{
-		authGroup := apiGroup.Group("/auth")
+		authGroup := apiGroup.Group("/auth", CSRFMiddleware(true))
 		{
 			authGroup.POST("/register", authHandler.Register)
 			authGroup.POST("/login", authHandler.Login)
+			authGroup.POST("/refresh", authHandler.Refresh)
 			authGroup.POST("/logout", authHandler.Logout)
+			authGroup.POST("/logout-everywhere", AuthMiddleware(authUseCase), authHandler.LogoutEverywhere)
 			authGroup.GET("/me", AuthMiddleware(authUseCase), authHandler.GetCurrentUser)
 		}
 
 		debtGroup := apiGroup.Group("/debts")
-		debtGroup.Use(AuthMiddleware(authUseCase))
+		debtGroup.Use(AuthMiddleware(authUseCase), CSRFMiddleware(false))
 		{
 			// Read operations (available to all authenticated users, scoped by person permissions)
 			debtGroup.GET("/summary", debtHandler.GetDashboardSummary)
@@ -59,7 +61,7 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 		}
 
 		adminGroup := apiGroup.Group("/admin")
-		adminGroup.Use(AuthMiddleware(authUseCase), RequireAdminRole())
+		adminGroup.Use(AuthMiddleware(authUseCase), RequireAdminRole(), CSRFMiddleware(false))
 		{
 			adminGroup.GET("/users", adminHandler.ListUsers)
 			adminGroup.POST("/users", adminHandler.CreateUser)

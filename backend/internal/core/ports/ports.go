@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"debtcontrol/backend/internal/core/domain"
@@ -51,16 +52,38 @@ type DebtRepository interface {
 	RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
+// SessionStore persists access-token revocation and opaque refresh sessions.
 type SessionStore interface {
+	// --- access token blacklist (existing behaviour) ---
 	StoreSession(ctx context.Context, userID string, tokenID string, expiration time.Duration) error
 	IsSessionBlacklisted(ctx context.Context, tokenID string) (bool, error)
 	InvalidateSession(ctx context.Context, tokenID string, expiration time.Duration) error
+
+	// --- refresh session families (rotation + reuse detection) ---
+	// CreateRefreshSession issues a fresh opaque refresh token for the user and
+	// returns the plaintext token (sent to the client once) and its family id.
+	// Only a hash of the token is ever stored.
+	CreateRefreshSession(ctx context.Context, userID string, expiration time.Duration) (token string, familyID string, err error)
+	// RotateRefreshSession validates the presented opaque token, rotates it to a
+	// new token, and returns the new plaintext (familyID unchanged). If the
+	// presented token was already spent (reuse detected) the whole family is
+	// revoked and ErrRefreshReuse is returned.
+	RefreshSession(ctx context.Context, presentedToken string, expiration time.Duration) (userID string, familyID string, newToken string, err error)
+	// RevokeSession revokes the family owning the presented refresh token (single-device logout).
+	RevokeSession(ctx context.Context, presentedToken string) error
+	// RevokeAllUserSessions revokes every refresh session family of the user (logout-everywhere).
+	RevokeAllUserSessions(ctx context.Context, userID string) error
 }
+
+// ErrRefreshReuse signals a previously rotated refresh token was presented again.
+var ErrRefreshReuse = errors.New("refresh token reuse detected, session revoked")
 
 type AuthUseCase interface {
 	Register(ctx context.Context, email string, password string, fullName string) (*domain.User, error)
 	Login(ctx context.Context, email string, password string) (accessToken string, refreshToken string, user *domain.User, err error)
-	Logout(ctx context.Context, tokenID string) error
+	Refresh(ctx context.Context, presentedRefreshToken string) (accessToken string, newRefreshToken string, user *domain.User, err error)
+	Logout(ctx context.Context, tokenID string, refreshToken string) error
+	LogoutEverywhere(ctx context.Context, userID string) error
 	ValidateAccessToken(ctx context.Context, tokenString string) (*domain.User, string, error)
 }
 

@@ -9,6 +9,44 @@ const apiClient = axios.create({
   },
 });
 
+// A short-lived token stored in memory; on each successful auth flow it is
+// refreshed from the HttpOnly cookie response. The cookie itself is the
+// source of truth for the session.
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Echo the non-HttpOnly double-submit CSRF cookie on every mutation.
+apiClient.interceptors.request.use((config) => {
+  const csrf = readCookie('csrf_token');
+  if (csrf) {
+    config.headers['X-CSRF-Token'] = csrf;
+  }
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config as any;
+    if (error.response?.status === 401 && !original?._retried) {
+      original._retried = true;
+      try {
+        const csrf = readCookie('csrf_token') ?? '';
+        await axios.post('/api/v1/auth/refresh', {}, {
+          withCredentials: true,
+          headers: { 'X-CSRF-Token': csrf },
+        });
+        return apiClient(original);
+      } catch {
+        // refresh failed; fall through to surface the original 401
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export interface UserWithPersons {
   user: User;
   assigned_persons: Person[];
@@ -34,15 +72,18 @@ export const apiService = {
   },
 
   login: async (email: string, password: string) => {
-    const response = await apiClient.post<{ user: User; access_token: string }>('/auth/login', { email, password });
-    if (response.data.access_token) {
-      apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
-    }
+    const response = await apiClient.post('/auth/login', { email, password });
     return response.data;
   },
 
   logout: async () => {
     const response = await apiClient.post('/auth/logout');
+    delete apiClient.defaults.headers.common['Authorization'];
+    return response.data;
+  },
+
+  logoutEverywhere: async () => {
+    const response = await apiClient.post('/auth/logout-everywhere');
     delete apiClient.defaults.headers.common['Authorization'];
     return response.data;
   },

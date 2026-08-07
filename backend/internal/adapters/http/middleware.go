@@ -1,6 +1,9 @@
 package http
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"net/http"
 	"strings"
 
@@ -9,6 +12,72 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+const csrfCookieName = "csrf_token"
+const csrfHeaderName = "X-CSRF-Token"
+
+// GenerateCSRFToken returns a fresh random token to be placed in a cookie.
+func GenerateCSRFToken() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
+}
+
+// CSRFMiddleware protects state-changing requests with a double-submit token:
+// a non-HttpOnly `csrf_token` cookie plus a matching `X-CSRF-Token` header.
+// Cookies are already SameSite=Strict + HttpOnly; this is the belt-and-suspenders
+// layer. When `latch` is true (auth bootstrap) a missing cookie is generated and
+// set so the client can echo it subsequently; protected groups (`latch=false`)
+// reject anything without an already-issued cookie.
+func CSRFMiddleware(latch bool) gin.HandlerFunc {
+	return func(ginContext *gin.Context) {
+		if !isStateChanging(ginContext.Request.Method) {
+			ginContext.Next()
+			return
+		}
+
+		cookieToken, cookieErr := ginContext.Cookie(csrfCookieName)
+		headerToken := ginContext.GetHeader(csrfHeaderName)
+
+		if cookieErr != nil {
+			if !latch {
+				ginContext.JSON(http.StatusForbidden, gin.H{"error": "CSRF token missing"})
+				ginContext.Abort()
+				return
+			}
+			// Bootstrap: issue a fresh token so the mutation can proceed and the
+			// client can latch it for subsequent requests.
+			token, err := GenerateCSRFToken()
+			if err != nil {
+				ginContext.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate CSRF token"})
+				ginContext.Abort()
+				return
+			}
+			ginContext.SetCookie(csrfCookieName, token, 24*60*60, "/", "", false, false)
+			ginContext.Next()
+			return
+		}
+
+		if headerToken == "" ||
+			subtle.ConstantTimeCompare([]byte(cookieToken), []byte(headerToken)) != 1 {
+			ginContext.JSON(http.StatusForbidden, gin.H{"error": "CSRF token mismatch or missing"})
+			ginContext.Abort()
+			return
+		}
+
+		ginContext.Next()
+	}
+}
+
+func isStateChanging(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	}
+	return false
+}
 
 func AuthMiddleware(authUseCase ports.AuthUseCase) gin.HandlerFunc {
 	return func(ginContext *gin.Context) {
