@@ -5,10 +5,13 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"debtcontrol/backend/internal/core/domain"
 	"debtcontrol/backend/internal/core/ports"
+	"debtcontrol/backend/pkg/ratelimit"
+	"debtcontrol/backend/pkg/security"
 
 	"github.com/gin-gonic/gin"
 )
@@ -138,6 +141,84 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		ginContext.Header("X-Content-Type-Options", "nosniff")
 		ginContext.Header("X-XSS-Protection", "1; mode=block")
 		ginContext.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		ginContext.Next()
+	}
+}
+
+// TurnstileMiddleware enforces a Cloudflare Turnstile token on the request.
+// When no secret is configured (local/dev) it is skipped. The token is read
+// from the JSON body "turnstile_token" field or the X-Turnstile-Token header.
+func TurnstileMiddleware(secret string) gin.HandlerFunc {
+	return func(ginContext *gin.Context) {
+		if secret == "" {
+			ginContext.Next()
+			return
+		}
+
+		responseToken := ginContext.GetHeader("X-Turnstile-Token")
+		if responseToken == "" {
+			var payload struct {
+				TurnstileToken string `json:"turnstile_token"`
+			}
+			_ = ginContext.ShouldBindBodyWithJSON(&payload)
+			responseToken = payload.TurnstileToken
+		}
+
+		if responseToken == "" {
+			ginContext.JSON(http.StatusForbidden, gin.H{"error": "CAPTCHA verification required"})
+			ginContext.Abort()
+			return
+		}
+
+		valid, err := security.VerifyTurnstile(ginContext.Request.Context(), secret, responseToken, clientIP(ginContext))
+		if err != nil {
+			ginContext.JSON(http.StatusInternalServerError, gin.H{"error": "CAPTCHA verification failed"})
+			ginContext.Abort()
+			return
+		}
+		if !valid {
+			ginContext.JSON(http.StatusForbidden, gin.H{"error": "CAPTCHA verification failed"})
+			ginContext.Abort()
+			return
+		}
+		ginContext.Next()
+	}
+}
+
+// clientIP returns the immediate peer address. Behind Render's proxy this is
+// the real client once forwarded headers are trusted; it is still a stable
+// key for rate limiting.
+func clientIP(ginContext *gin.Context) string {
+	forwarded := ginContext.GetHeader("X-Forwarded-For")
+	if forwarded != "" {
+		parts := strings.Split(forwarded, ",")
+		if first := strings.TrimSpace(parts[0]); first != "" {
+			return first
+		}
+	}
+	return ginContext.ClientIP()
+}
+
+// RateLimitMiddleware enforces zero-or-more policies keyed by the tuple
+// (scope, clientIP[, account]). accountKey (e.g. the email/username) is
+// optional and lets logins also be limited per-account to stop credential
+// stuffing that spreads across many IPs.
+func RateLimitMiddleware(limiter *ratelimit.Limiter, scope string, policies []ratelimit.Policy, accountKey func(*gin.Context) string) gin.HandlerFunc {
+	return func(ginContext *gin.Context) {
+		key := scope + ":ip:" + clientIP(ginContext)
+		if accountKey != nil {
+			if account := accountKey(ginContext); account != "" {
+				key += ":account:" + account
+			}
+		}
+
+		allowed, retryIn := limiter.Allow(ginContext.Request.Context(), key, policies)
+		if !allowed {
+			ginContext.Header("Retry-After", strconv.Itoa(int(retryIn.Seconds())))
+			ginContext.JSON(http.StatusTooManyRequests, gin.H{"error": "too many attempts, slow down"})
+			ginContext.Abort()
+			return
+		}
 		ginContext.Next()
 	}
 }

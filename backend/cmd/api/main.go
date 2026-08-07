@@ -7,12 +7,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	httpAdapter "debtcontrol/backend/internal/adapters/http"
 	postgresAdapter "debtcontrol/backend/internal/adapters/postgres"
 	redisAdapter "debtcontrol/backend/internal/adapters/redis"
 	"debtcontrol/backend/internal/core/ports"
 	"debtcontrol/backend/internal/core/services"
+	"debtcontrol/backend/pkg/ratelimit"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
@@ -101,12 +103,13 @@ func main() {
 	_ = debtRepository.EnsurePurchaseItemForeignKey(ctx)
 
 	var sessionRepository ports.SessionStore
+	var redisClient *redis.Client
 	redisHost := os.Getenv("REDIS_HOST")
 	redisEnabled := getEnvOrDefault("REDIS_ENABLED", "false")
 
 	if redisEnabled == "true" && redisHost != "" {
 		redisPort := getEnvOrDefault("REDIS_PORT", "6379")
-		redisClient := redis.NewClient(&redis.Options{
+		redisClient = redis.NewClient(&redis.Options{
 			Addr: fmt.Sprintf("%s:%s", redisHost, redisPort),
 		})
 		sessionRepository = redisAdapter.NewSessionRepository(redisClient)
@@ -125,11 +128,34 @@ func main() {
 
 	_ = debtService.SeedInitialSpreadsheetData(ctx)
 
+	var rateLimitStore ratelimit.Store = ratelimit.NewMemoryStore()
+	if redisClient != nil {
+		rateLimitStore = ratelimit.NewRedisStore(redisClient)
+	}
+	rateLimiter := ratelimit.NewLimiter(rateLimitStore)
+
+	securityOptions := httpAdapter.SecurityOptions{
+		RateLimiter:     rateLimiter,
+		TurnstileSecret: getEnvOrDefault("TURNSTILE_SECRET", ""),
+		// Login: per IP+account, 5 per 15 minutes (credential stuffing resistant).
+		LoginPolicies: []ratelimit.Policy{
+			{Limit: 5, Window: 15 * time.Minute},
+		},
+		// Register: per IP, 10 per 24h (closed by default; generous ceiling for admins).
+		RegisterPolicies: []ratelimit.Policy{
+			{Limit: 10, Window: 24 * time.Hour},
+		},
+		// Global API throttle: per IP, 300 per minute protects against abusive traffic.
+		GlobalPolicies: []ratelimit.Policy{
+			{Limit: 300, Window: time.Minute},
+		},
+	}
+
 	allowedOrigins := strings.Split(getEnvOrDefault(
 		"ALLOWED_ORIGINS",
 		"http://localhost:5173,http://localhost:3000,https://debtcontrol-1.onrender.com",
 	), ",")
-	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, allowedOrigins, getEnvBoolOrDefault("REGISTRATION_ENABLED", false))
+	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, allowedOrigins, getEnvBoolOrDefault("REGISTRATION_ENABLED", false), securityOptions)
 
 	serverPort := getEnvOrDefault("PORT", "8080")
 	log.Printf("Server listening on http://localhost:%s", serverPort)

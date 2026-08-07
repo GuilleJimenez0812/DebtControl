@@ -71,13 +71,13 @@ export const apiService = {
     return response.data;
   },
 
-  register: async (email: string, password: string, fullName: string) => {
-    const response = await apiClient.post('/auth/register', { email, password, full_name: fullName });
+  register: async (email: string, password: string, fullName: string, turnstileToken?: string) => {
+    const response = await apiClient.post('/auth/register', { email, password, full_name: fullName, turnstile_token: turnstileToken ?? '' });
     return response.data;
   },
 
-  login: async (email: string, password: string): Promise<LoginResult> => {
-    const response = await apiClient.post<LoginResult>('/auth/login', { email, password });
+  login: async (email: string, password: string, turnstileToken?: string): Promise<LoginResult> => {
+    const response = await apiClient.post<LoginResult>('/auth/login', { email, password, turnstile_token: turnstileToken ?? '' });
     return response.data;
   },
 
