@@ -9,6 +9,7 @@ interface AuthModalProps {
   onCompleteMFA: (mfaTicket: string, code: string) => Promise<LoginResult>;
   onRegister: (email: string, pass: string, name: string) => Promise<void>;
   registrationEnabled: boolean;
+  onForgotPassword?: () => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -18,6 +19,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onCompleteMFA,
   onRegister,
   registrationEnabled,
+  onForgotPassword,
 }) => {
   const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
   const [email, setEmail] = useState<string>('');
@@ -252,6 +254,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {isRegisterMode
                 ? 'Already have an account? Sign In'
                 : "Don't have an account? Register"}
+            </button>
+          </div>
+        )}
+
+        {!mfaTicket && !isRegisterMode && onForgotPassword && (
+          <div className="mt-3 text-center">
+            <button
+              onClick={() => {
+                onForgotPassword();
+              }}
+              className="text-xs text-slate-400 hover:text-indigo-300 transition"
+            >
+              Forgot password?
             </button>
           </div>
         )}

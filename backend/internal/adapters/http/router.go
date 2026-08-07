@@ -16,7 +16,13 @@ type SecurityOptions struct {
 	LoginPolicies    []ratelimit.Policy // per IP+account
 	RegisterPolicies []ratelimit.Policy // per IP
 	GlobalPolicies   []ratelimit.Policy // per IP, every /api/v1 request
-	TurnstileSecret  string
+	// ResetRequestPolicies throttle "forgot password" POSTs to prevent OTP
+	// mailbox flooding (per IP).
+	ResetRequestPolicies []ratelimit.Policy
+	// ResetVerifyPolicies throttle OTP+ticket verification to stop code guessing
+	// (per IP).
+	ResetVerifyPolicies []ratelimit.Policy
+	TurnstileSecret     string
 }
 
 func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase, allowedOrigins []string, registrationEnabled bool, security SecurityOptions) *gin.Engine {
@@ -72,6 +78,21 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 			authGroup.POST("/logout", CSRFMiddleware(true), authHandler.Logout)
 			authGroup.POST("/logout-everywhere", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.LogoutEverywhere)
 			authGroup.POST("/change-password", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.ChangePassword)
+
+			// Password reset (forgot password) — CSRF + per-IP throttling to
+			// avoid OTP mailbox flooding and code guessing.
+			authGroup.POST("/forgot-password",
+				CSRFMiddleware(true),
+				RateLimitMiddleware(security.RateLimiter, "forgot-password", security.ResetRequestPolicies, nil),
+				authHandler.RequestPasswordReset)
+			authGroup.POST("/verify-reset-otp",
+				CSRFMiddleware(true),
+				RateLimitMiddleware(security.RateLimiter, "verify-reset-otp", security.ResetVerifyPolicies, nil),
+				authHandler.VerifyPasswordResetOTP)
+			authGroup.POST("/reset-password",
+				CSRFMiddleware(true),
+				RateLimitMiddleware(security.RateLimiter, "reset-password", security.ResetVerifyPolicies, nil),
+				authHandler.ResetPassword)
 			authGroup.GET("/me", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.GetCurrentUser)
 		}
 

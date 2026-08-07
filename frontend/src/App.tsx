@@ -12,6 +12,7 @@ import { PurchaseDetailModal } from './components/PurchaseDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { TOTPSettingsModal } from './components/TOTPSettingsModal';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { ForgotPasswordModal } from './components/ForgotPasswordModal';
 import { AuthWall } from './components/AuthWall';
 import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewPaymentModal } from './components/NewPaymentModal';
@@ -56,6 +57,7 @@ const DashboardContent: React.FC = () => {
   const [isUploadInvoiceOpen, setIsUploadInvoiceOpen] = useState<boolean>(false);
   const [isSecurityOpen, setIsSecurityOpen] = useState<boolean>(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState<boolean>(false);
   const [previewInvoiceUrl, setPreviewInvoiceUrl] = useState<string | null>(null);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState<boolean>(false);
   const [selectedPersonForPayment, setSelectedPersonForPayment] = useState<Person | null>(null);
@@ -322,6 +324,15 @@ const DashboardContent: React.FC = () => {
         onCompleteMFA={handleCompleteMFA}
         onRegister={handleRegister}
         registrationEnabled={registrationEnabled}
+        onForgotPassword={() => {
+          setIsAuthOpen(false);
+          setIsForgotPasswordOpen(true);
+        }}
+      />
+
+      <ForgotPasswordModal
+        isOpen={isForgotPasswordOpen}
+        onClose={() => setIsForgotPasswordOpen(false)}
       />
 
       <TOTPSettingsModal

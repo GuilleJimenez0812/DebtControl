@@ -25,6 +25,20 @@ type ChangePasswordRequest struct {
 	NewPassword     string `json:"new_password" binding:"required,min=12"`
 }
 
+type RequestPasswordResetRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type VerifyPasswordResetOTPRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code  string `json:"code" binding:"required,len=6"`
+}
+
+type ResetPasswordRequest struct {
+	Ticket      string `json:"reset_ticket" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=12"`
+}
+
 type CreatePurchaseRequest struct {
 	PersonName   string  `json:"person_name" binding:"required"`
 	OrderNumber  string  `json:"order_number"`

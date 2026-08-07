@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"time"
 
 	"debtcontrol/backend/internal/core/domain"
@@ -20,6 +21,15 @@ var (
 	ErrUserNotFound       = errors.New("user not found")
 	ErrTOTPNotProvisioned = errors.New("TOTP not provisioned")
 	ErrInvalidTOTPCode    = errors.New("invalid TOTP code")
+	ErrResetCodeExhausted = errors.New("verification code exhausted or expired")
+	ErrInvalidResetCode   = errors.New("invalid verification code")
+	ErrResetTicketExpired = errors.New("password reset session expired, please start over")
+)
+
+const (
+	passwordResetCodeTTL         = 10 * time.Minute
+	passwordResetCodeMaxAttempts = 5
+	passwordResetTicketTTL       = 10 * time.Minute
 )
 
 func generateOpaqueTicket() (string, error) {
@@ -30,16 +40,38 @@ func generateOpaqueTicket() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
+// generateSixDigitCode returns a cryptographically random 6-digit code
+// (000000-999999) for email OTPs.
+func generateSixDigitCode() (string, error) {
+	// Take 20 random bits and reject values above 1,000,000 for a uniform
+	// distribution over 000000-999999.
+	var result int
+	for {
+		buf := make([]byte, 3)
+		if _, err := rand.Read(buf); err != nil {
+			return "", err
+		}
+		candidate := (int(buf[0]) << 16) | (int(buf[1]) << 8) | int(buf[2])
+		if candidate < 1000000 {
+			result = candidate
+			break
+		}
+	}
+	return fmt.Sprintf("%06d", result), nil
+}
+
 type AuthService struct {
 	userRepo     ports.UserRepository
 	sessionStore ports.SessionStore
+	emailSender  ports.EmailSender
 	jwtSecret    string
 }
 
-func NewAuthService(userRepo ports.UserRepository, sessionStore ports.SessionStore, jwtSecret string) *AuthService {
+func NewAuthService(userRepo ports.UserRepository, sessionStore ports.SessionStore, emailSender ports.EmailSender, jwtSecret string) *AuthService {
 	return &AuthService{
 		userRepo:     userRepo,
 		sessionStore: sessionStore,
+		emailSender:  emailSender,
 		jwtSecret:    jwtSecret,
 	}
 }
@@ -141,6 +173,93 @@ func (service *AuthService) ChangePassword(ctx context.Context, userID string, c
 
 	if service.sessionStore != nil {
 		_ = service.sessionStore.RevokeAllUserSessions(ctx, userID)
+	}
+	return nil
+}
+
+// RequestPasswordReset generates a short-lived single-use 6-digit code, stores
+// it keyed by email, and emails it. It never reveals whether an account exists
+// (anti-enumeration): unknown emails still succeed without sending.
+func (service *AuthService) RequestPasswordReset(ctx context.Context, email string) error {
+	user, err := service.userRepo.FindByEmail(ctx, email)
+	if err != nil || user == nil {
+		return nil // never leak account existence
+	}
+
+	code, err := generateSixDigitCode()
+	if err != nil {
+		return err
+	}
+
+	if service.sessionStore != nil {
+		if err := service.sessionStore.StorePasswordResetOTP(ctx, email, code, passwordResetCodeMaxAttempts, passwordResetCodeTTL); err != nil {
+			return err
+		}
+	}
+
+	if service.emailSender != nil {
+		return service.emailSender.SendPasswordResetOTP(ctx, email, code)
+	}
+	return nil
+}
+
+// VerifyPasswordResetOTP checks the presented code in constant time. On
+// success it exchanges the verified code for a single-use reset ticket.
+func (service *AuthService) VerifyPasswordResetOTP(ctx context.Context, email string, presentedCode string) (string, error) {
+	if service.sessionStore == nil {
+		return "", ErrResetCodeExhausted
+	}
+	valid, err := service.sessionStore.VerifyPasswordResetOTP(ctx, email, presentedCode)
+	if err != nil {
+		return "", ErrResetCodeExhausted
+	}
+	if !valid {
+		return "", ErrInvalidResetCode
+	}
+
+	ticket, err := generateOpaqueTicket()
+	if err != nil {
+		return "", err
+	}
+	if err := service.sessionStore.StorePasswordResetTicket(ctx, ticket, email, passwordResetTicketTTL); err != nil {
+		return "", err
+	}
+	return ticket, nil
+}
+
+// ResetPassword completes the flow: redeems the single-use ticket, applies the
+// password policy, persists the new bcrypt hash, and revokes all sessions.
+func (service *AuthService) ResetPassword(ctx context.Context, ticket string, newPassword string) error {
+	if service.sessionStore == nil {
+		return ErrResetTicketExpired
+	}
+	email, err := service.sessionStore.ConsumePasswordResetTicket(ctx, ticket)
+	if err != nil {
+		return ErrResetTicketExpired
+	}
+
+	user, err := service.userRepo.FindByEmail(ctx, email)
+	if err != nil || user == nil {
+		return ErrUserNotFound
+	}
+
+	if err := security.ValidatePasswordPolicy(newPassword); err != nil {
+		return err
+	}
+
+	newHash, err := security.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	user.PasswordHash = newHash
+	user.UpdatedAt = time.Now()
+	if err := service.userRepo.Update(ctx, user); err != nil {
+		return err
+	}
+
+	if service.sessionStore != nil {
+		_ = service.sessionStore.RevokeAllUserSessions(ctx, user.ID)
 	}
 	return nil
 }

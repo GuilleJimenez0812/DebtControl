@@ -127,6 +127,25 @@ export const apiService = {
     return response.data;
   },
 
+  requestPasswordReset: async (email: string) => {
+    const response = await apiClient.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  verifyResetOTP: async (email: string, code: string): Promise<{ reset_ticket: string }> => {
+    const response = await apiClient.post('/auth/verify-reset-otp', { email, code });
+    return response.data;
+  },
+
+  resetPassword: async (resetTicket: string, newPassword: string) => {
+    const response = await apiClient.post('/auth/reset-password', {
+      reset_ticket: resetTicket,
+      new_password: newPassword,
+    });
+    delete apiClient.defaults.headers.common['Authorization'];
+    return response.data;
+  },
+
   getCurrentUser: async (): Promise<User | null> => {
     try {
       const response = await apiClient.get<{ user: User }>('/auth/me');

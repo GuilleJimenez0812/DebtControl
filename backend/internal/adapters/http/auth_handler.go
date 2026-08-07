@@ -260,6 +260,54 @@ func (handler *AuthHandler) DisableTOTP(ginContext *gin.Context) {
 	ginContext.JSON(http.StatusOK, gin.H{"message": "totp disabled", "totp_enabled": false})
 }
 
+func (handler *AuthHandler) RequestPasswordReset(ginContext *gin.Context) {
+	var requestPayload RequestPasswordResetRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := handler.authUseCase.RequestPasswordReset(ginContext.Request.Context(), requestPayload.Email); err != nil {
+		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Always answer the same way so the response never reveals whether an
+	// account exists for that email.
+	ginContext.JSON(http.StatusOK, gin.H{"message": "if that email is registered, a reset code was sent"})
+}
+
+func (handler *AuthHandler) VerifyPasswordResetOTP(ginContext *gin.Context) {
+	var requestPayload VerifyPasswordResetOTPRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ticket, err := handler.authUseCase.VerifyPasswordResetOTP(ginContext.Request.Context(), requestPayload.Email, requestPayload.Code)
+	if err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"reset_ticket": ticket})
+}
+
+func (handler *AuthHandler) ResetPassword(ginContext *gin.Context) {
+	var requestPayload ResetPasswordRequest
+	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := handler.authUseCase.ResetPassword(ginContext.Request.Context(), requestPayload.Ticket, requestPayload.NewPassword); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ginContext.JSON(http.StatusOK, gin.H{"message": "password reset, all sessions signed out"})
+}
+
 func (handler *AuthHandler) GetTOTPStatus(ginContext *gin.Context) {
 	currentUser, exists := ginContext.Get("user")
 	if !exists {

@@ -48,6 +48,11 @@ func (s *stubAuth) GetTOTPStatus(ctx context.Context, userID string) (bool, erro
 func (s *stubAuth) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
 	return nil
 }
+func (s *stubAuth) RequestPasswordReset(ctx context.Context, email string) error { return nil }
+func (s *stubAuth) VerifyPasswordResetOTP(ctx context.Context, email, code string) (string, error) {
+	return "", nil
+}
+func (s *stubAuth) ResetPassword(ctx context.Context, ticket, newPassword string) error { return nil }
 
 var _ ports.AuthUseCase = (*stubAuth)(nil)
 
@@ -228,6 +233,32 @@ func TestChangePasswordRequiresAuthentication(t *testing.T) {
 	// No access token -> AuthMiddleware aborts with 401 before validating the
 	// payload, proving the route is protected.
 	assert.Equal(t, http.StatusUnauthorized, response.Code)
+}
+
+func TestForgotPasswordRateLimitedPerIP(t *testing.T) {
+	limiter := ratelimit.NewLimiter(ratelimit.NewMemoryStore())
+	router := newTestRouter(httpAdapter.SecurityOptions{
+		RateLimiter:          limiter,
+		ResetRequestPolicies: []ratelimit.Policy{{Limit: 2, Window: time.Minute}},
+		ResetVerifyPolicies:  []ratelimit.Policy{{Limit: 100, Window: time.Minute}},
+		TurnstileSecret:      "",
+	})
+
+	body := `{"email":"reset@b.com"}`
+	for i := 0; i < 2; i++ {
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/forgot-password", bytes.NewBufferString(body))
+		request.RemoteAddr = "203.0.113.20:1234"
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		require.NotEqual(t, http.StatusTooManyRequests, response.Code, "request %d", i+1)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/auth/forgot-password", bytes.NewBufferString(body))
+	request.RemoteAddr = "203.0.113.20:1234"
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	assert.Equal(t, http.StatusTooManyRequests, response.Code)
+	assert.NotEmpty(t, response.Header().Get("Retry-After"))
 }
 
 var errLoginFailed = &testHTTPErr{"invalid email or password"}

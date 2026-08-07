@@ -10,6 +10,7 @@ import (
 	"time"
 
 	httpAdapter "debtcontrol/backend/internal/adapters/http"
+	emailAdapter "debtcontrol/backend/internal/adapters/email"
 	postgresAdapter "debtcontrol/backend/internal/adapters/postgres"
 	redisAdapter "debtcontrol/backend/internal/adapters/redis"
 	"debtcontrol/backend/internal/core/ports"
@@ -135,7 +136,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("FATAL: %v", err)
 	}
-	authService := services.NewAuthService(userRepository, sessionRepository, jwtSecret)
+	emailSender := emailAdapter.NewResendSender(getEnvOrDefault("EMAIL_FROM", "DebtControl <otp@mail.yourdomain.com>"))
+	authService := services.NewAuthService(userRepository, sessionRepository, emailSender, jwtSecret)
 	debtService := services.NewDebtService(debtRepository, auditRepository, userRepository, orderSearcher)
 	adminService := services.NewAdminService(userRepository, debtRepository)
 
@@ -161,6 +163,14 @@ func main() {
 		// Global API throttle: per IP, 300 per minute protects against abusive traffic.
 		GlobalPolicies: []ratelimit.Policy{
 			{Limit: 300, Window: time.Minute},
+		},
+		// Forgot-password: per IP, 3 per 15 minutes (OTP mailbox flooding).
+		ResetRequestPolicies: []ratelimit.Policy{
+			{Limit: 3, Window: 15 * time.Minute},
+		},
+		// OTP/ticket verification: per IP, 10 per 15 minutes (code guessing).
+		ResetVerifyPolicies: []ratelimit.Policy{
+			{Limit: 10, Window: 15 * time.Minute},
 		},
 	}
 

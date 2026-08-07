@@ -114,3 +114,50 @@ func TestMFAChallengeUnknownTicketRejected(t *testing.T) {
 	_, err := store.ConsumeMFAChallenge(context.Background(), "does-not-exist")
 	assert.Error(t, err)
 }
+
+func TestPasswordResetOTPIsSingleUse(t *testing.T) {
+	store := newTestStore()
+	require.NoError(t, store.StorePasswordResetOTP(context.Background(), "a@b.com", "123456", 5, 10*time.Minute))
+
+	valid, err := store.VerifyPasswordResetOTP(context.Background(), "a@b.com", "123456")
+	require.NoError(t, err)
+	assert.True(t, valid)
+
+	// Single-use: a second redemption fails.
+	valid, err = store.VerifyPasswordResetOTP(context.Background(), "a@b.com", "123456")
+	require.NoError(t, err)
+	assert.False(t, valid)
+}
+
+func TestPasswordResetOTPDecrementsAttemptsOnWrongCode(t *testing.T) {
+	store := newTestStore()
+	require.NoError(t, store.StorePasswordResetOTP(context.Background(), "a@b.com", "123456", 2, 10*time.Minute))
+
+	// First wrong try decrements and remains usable.
+	valid, err := store.VerifyPasswordResetOTP(context.Background(), "a@b.com", "000000")
+	require.NoError(t, err)
+	assert.False(t, valid)
+
+	// Second wrong try exhausts the budget.
+	_, err = store.VerifyPasswordResetOTP(context.Background(), "a@b.com", "000000")
+	assert.Error(t, err)
+}
+
+func TestPasswordResetOTPUnknownEmailNoError(t *testing.T) {
+	store := newTestStore()
+	valid, err := store.VerifyPasswordResetOTP(context.Background(), "ghost@b.com", "000000")
+	require.NoError(t, err)
+	assert.False(t, valid)
+}
+
+func TestPasswordResetTicketIsSingleUse(t *testing.T) {
+	store := newTestStore()
+	require.NoError(t, store.StorePasswordResetTicket(context.Background(), "tk-1", "a@b.com", 10*time.Minute))
+
+	email, err := store.ConsumePasswordResetTicket(context.Background(), "tk-1")
+	require.NoError(t, err)
+	assert.Equal(t, "a@b.com", email)
+
+	_, err = store.ConsumePasswordResetTicket(context.Background(), "tk-1")
+	assert.Error(t, err)
+}

@@ -51,22 +51,33 @@ func (r *fakeUserRepo) GetAssignedPersonIDs(ctx context.Context, u string) ([]st
 }
 
 type fakeAuthSession struct {
-	spent       map[string]bool
-	current     map[string]string // familyID -> current token
-	userByToken map[string]string
-	revokedAll  map[string]bool
-	revokedTok  map[string]bool
+	spent        map[string]bool
+	current      map[string]string // familyID -> current token
+	userByToken  map[string]string
+	revokedAll   map[string]bool
+	revokedTok   map[string]bool
+	otp          map[string]*otpRecord
+	resetTickets map[string]string
 }
 
 func newFakeAuthSession() *fakeAuthSession {
 	return &fakeAuthSession{
-		spent:       make(map[string]bool),
-		current:     make(map[string]string),
-		userByToken: make(map[string]string),
-		revokedAll:  make(map[string]bool),
-		revokedTok:  make(map[string]bool),
+		spent:        make(map[string]bool),
+		current:      make(map[string]string),
+		userByToken:  make(map[string]string),
+		revokedAll:   make(map[string]bool),
+		revokedTok:   make(map[string]bool),
+		otp:          make(map[string]*otpRecord),
+		resetTickets: make(map[string]string),
 	}
 }
+
+type otpRecord struct {
+	code     string
+	attempts int
+}
+
+var errOTPExhausted = &testErr{"otp exhausted"}
 
 func (s *fakeAuthSession) StoreSession(ctx context.Context, userID, tokenID string, exp time.Duration) error {
 	return nil
@@ -125,6 +136,42 @@ func (s *fakeAuthSession) ConsumeMFAChallenge(ctx context.Context, ticket string
 	return userID, nil
 }
 
+func (s *fakeAuthSession) StorePasswordResetOTP(ctx context.Context, email, code string, maxAttempts int, exp time.Duration) error {
+	s.otp[email] = &otpRecord{code: code, attempts: maxAttempts}
+	return nil
+}
+
+func (s *fakeAuthSession) VerifyPasswordResetOTP(ctx context.Context, email, presentedCode string) (bool, error) {
+	rec, ok := s.otp[email]
+	if !ok {
+		return false, nil
+	}
+	if rec.code == presentedCode {
+		delete(s.otp, email)
+		return true, nil
+	}
+	rec.attempts--
+	if rec.attempts <= 0 {
+		delete(s.otp, email)
+		return false, errOTPExhausted
+	}
+	return false, nil
+}
+
+func (s *fakeAuthSession) StorePasswordResetTicket(ctx context.Context, ticket, email string, exp time.Duration) error {
+	s.resetTickets[ticket] = email
+	return nil
+}
+
+func (s *fakeAuthSession) ConsumePasswordResetTicket(ctx context.Context, ticket string) (string, error) {
+	email, ok := s.resetTickets[ticket]
+	if !ok {
+		return "", errInvalidRefreshToken
+	}
+	delete(s.resetTickets, ticket)
+	return email, nil
+}
+
 func itoa(n int) string {
 	return string(rune('a' + n%26))
 }
@@ -141,8 +188,18 @@ func (e *testErr) Error() string { return e.msg }
 func newTestAuthService() (*services.AuthService, *fakeUserRepo, *fakeAuthSession) {
 	repo := newFakeUserRepo()
 	sessions := newFakeAuthSession()
-	svc := services.NewAuthService(repo, sessions, testJWTSecret)
+	svc := services.NewAuthService(repo, sessions, fakeEmailer{}, testJWTSecret)
 	return svc, repo, sessions
+}
+
+// fakeEmailer captures the last reset email so tests can assert delivery.
+type fakeEmailer struct {
+	lastEmail string
+	lastCode  string
+}
+
+func (fakeEmailer) SendPasswordResetOTP(ctx context.Context, toEmail string, code string) error {
+	return nil
 }
 
 func mustCreateUser(t *testing.T, repo *fakeUserRepo, id, email, password string) *domain.User {
@@ -376,4 +433,106 @@ func TestChangePasswordRejectsUnknownUser(t *testing.T) {
 	svc, _, _ := newTestAuthService()
 	err := svc.ChangePassword(context.Background(), "nobody", "old-password-123", "new-password-456")
 	assert.ErrorIs(t, err, services.ErrUserNotFound)
+}
+
+func TestRequestPasswordResetStoresOTPAndEmails(t *testing.T) {
+	svc, repo, sessions := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "reset@b.com", "old-password-123")
+
+	err := svc.RequestPasswordReset(context.Background(), "reset@b.com")
+	require.NoError(t, err)
+
+	record, exists := sessions.otp["reset@b.com"]
+	assert.True(t, exists)
+	assert.NotEmpty(t, record.code)
+	assert.Equal(t, 5, record.attempts)
+}
+
+func TestRequestPasswordResetDoesNotLeakUnknownEmail(t *testing.T) {
+	svc, _, _ := newTestAuthService()
+
+	err := svc.RequestPasswordReset(context.Background(), "ghost@b.com")
+	require.NoError(t, err)
+}
+
+func TestVerifyPasswordResetOTPRedeemsCodeForTicket(t *testing.T) {
+	svc, repo, sessions := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "reset@b.com", "old-password-123")
+	require.NoError(t, svc.RequestPasswordReset(context.Background(), "reset@b.com"))
+
+	code := sessions.otp["reset@b.com"].code
+	ticket, err := svc.VerifyPasswordResetOTP(context.Background(), "reset@b.com", code)
+	require.NoError(t, err)
+	assert.NotEmpty(t, ticket)
+	// The code is single-use.
+	_, err = svc.VerifyPasswordResetOTP(context.Background(), "reset@b.com", code)
+	assert.Error(t, err)
+}
+
+func TestVerifyPasswordResetOTPRejectsWrongCode(t *testing.T) {
+	svc, repo, _ := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "reset@b.com", "old-password-123")
+	require.NoError(t, svc.RequestPasswordReset(context.Background(), "reset@b.com"))
+
+	_, err := svc.VerifyPasswordResetOTP(context.Background(), "reset@b.com", "000000")
+	assert.ErrorIs(t, err, services.ErrInvalidResetCode)
+}
+
+func TestVerifyPasswordResetOTPExhaustsAttempts(t *testing.T) {
+	svc, repo, sessions := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "reset@b.com", "old-password-123")
+	require.NoError(t, svc.RequestPasswordReset(context.Background(), "reset@b.com"))
+
+	for i := 0; i < 5; i++ {
+		_, err := svc.VerifyPasswordResetOTP(context.Background(), "reset@b.com", "000000")
+		require.Error(t, err)
+	}
+	// Code is gone after exhausting attempts.
+	_, exists := sessions.otp["reset@b.com"]
+	assert.False(t, exists)
+}
+
+func TestResetPasswordUpdatesHashAndRevokesSessions(t *testing.T) {
+	svc, repo, sessions := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "reset@b.com", "old-password-123")
+	require.NoError(t, svc.RequestPasswordReset(context.Background(), "reset@b.com"))
+
+	code := sessions.otp["reset@b.com"].code
+	ticket, err := svc.VerifyPasswordResetOTP(context.Background(), "reset@b.com", code)
+	require.NoError(t, err)
+
+	err = svc.ResetPassword(context.Background(), ticket, "brand-new-password-789")
+	require.NoError(t, err)
+
+	stored, _ := repo.FindByID(context.Background(), "user-1")
+	assert.NoError(t, security.ComparePassword(stored.PasswordHash, "brand-new-password-789"))
+	assert.Error(t, security.ComparePassword(stored.PasswordHash, "old-password-123"))
+	assert.True(t, sessions.revokedAll["user-1"])
+}
+
+func TestResetPasswordRejectsSpentTicket(t *testing.T) {
+	svc, repo, sessions := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "reset@b.com", "old-password-123")
+	require.NoError(t, svc.RequestPasswordReset(context.Background(), "reset@b.com"))
+
+	code := sessions.otp["reset@b.com"].code
+	ticket, err := svc.VerifyPasswordResetOTP(context.Background(), "reset@b.com", code)
+	require.NoError(t, err)
+
+	require.NoError(t, svc.ResetPassword(context.Background(), ticket, "brand-new-password-789"))
+	err = svc.ResetPassword(context.Background(), ticket, "another-password-000")
+	assert.ErrorIs(t, err, services.ErrResetTicketExpired)
+}
+
+func TestResetPasswordRejectsWeakPolicy(t *testing.T) {
+	svc, repo, sessions := newTestAuthService()
+	mustCreateUser(t, repo, "user-1", "reset@b.com", "old-password-123")
+	require.NoError(t, svc.RequestPasswordReset(context.Background(), "reset@b.com"))
+
+	code := sessions.otp["reset@b.com"].code
+	ticket, err := svc.VerifyPasswordResetOTP(context.Background(), "reset@b.com", code)
+	require.NoError(t, err)
+
+	err = svc.ResetPassword(context.Background(), ticket, "short")
+	assert.ErrorIs(t, err, security.ErrPasswordTooShort)
 }

@@ -29,6 +29,13 @@ type OrderSearcher interface {
 	SearchOrders(ctx context.Context, query string, personIDs []string, limit int) ([]*SearchResult, error)
 }
 
+// EmailSender delivers transactional emails (currently password-reset OTPs).
+// Implementations must be safe to call without a configured provider (a no-op
+// or dev logger) so local dev and tests never need real credentials.
+type EmailSender interface {
+	SendPasswordResetOTP(ctx context.Context, toEmail string, code string) error
+}
+
 type DebtRepository interface {
 	FindAllPersons(ctx context.Context) ([]*domain.Person, error)
 	FindPersonByID(ctx context.Context, id string) (*domain.Person, error)
@@ -81,6 +88,21 @@ type SessionStore interface {
 	// ConsumeMFAChallenge atomically redeems the ticket once, returning the
 	// user id. Redeeming an already-spent ticket returns an error.
 	ConsumeMFAChallenge(ctx context.Context, ticket string) (string, error)
+
+	// StorePasswordResetOTP records a short-lived 6-digit reset code keyed by
+	// email, with a limited attempt budget. Codes are redeemed once (single-use).
+	StorePasswordResetOTP(ctx context.Context, email string, code string, maxAttempts int, expiration time.Duration) error
+	// VerifyPasswordResetOTP checks the presented code in constant time. On a
+	// valid code it consumes it (single-use) and returns true, nil. A wrong
+	// code decrements the remaining attempts. A bool=false with nil error means
+	// the code was wrong but the caller may retry; any error means the code can
+	// no longer be used (exhausted, expired, or never issued).
+	VerifyPasswordResetOTP(ctx context.Context, email string, presentedCode string) (valid bool, err error)
+
+	// ResetPasswordTicket mirrors the MFA ticket so a verified OTP can be
+	// exchanged single-use for the actual password update.
+	StorePasswordResetTicket(ctx context.Context, ticket string, email string, expiration time.Duration) error
+	ConsumePasswordResetTicket(ctx context.Context, ticket string) (string, error)
 }
 
 // ErrRefreshReuse signals a previously rotated refresh token was presented again.
@@ -103,6 +125,15 @@ type AuthUseCase interface {
 	// ChangePassword verifies the current password, applies the password policy
 	// to the new one, and revokes the user's other sessions.
 	ChangePassword(ctx context.Context, userID string, currentPassword string, newPassword string) error
+
+	// RequestPasswordReset emails a short-lived single-use OTP to the account
+	// (or silently succeeds for unknown emails to avoid enumeration).
+	RequestPasswordReset(ctx context.Context, email string) error
+	// VerifyPasswordResetOTP validates the emailed code and returns a single-use
+	// ticket that unlocks the actual password update.
+	VerifyPasswordResetOTP(ctx context.Context, email string, presentedCode string) (ticket string, err error)
+	// ResetPassword redeems the verified ticket and sets the new password.
+	ResetPassword(ctx context.Context, ticket string, newPassword string) error
 }
 
 // LoginResult captures a successful password check. When MFA is required the

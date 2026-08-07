@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -278,6 +279,78 @@ func (repository *SessionRepository) mfaTicketKey(ticket string) string {
 	return "mfa:ticket:" + ticket
 }
 
+func (repository *SessionRepository) passwordResetOTPKey(email string) string {
+	return "pwdreset:otp:" + email
+}
+
+func (repository *SessionRepository) passwordResetTicketKey(ticket string) string {
+	return "pwdreset:ticket:" + ticket
+}
+
+// confirmOTPRecord is the stored state of one password-reset OTP: the code and
+// how many attempts remain. The code is compared in constant time on verify.
+type passwordResetOTPRecord struct {
+	Code     string `json:"code"`
+	Attempts int    `json:"attempts"`
+}
+
+var errResetOTPExhausted = errors.New("password reset code exhausted or expired")
+
+func (repository *SessionRepository) StorePasswordResetOTP(ctx context.Context, email string, code string, maxAttempts int, expiration time.Duration) error {
+	record, err := json.Marshal(passwordResetOTPRecord{Code: code, Attempts: maxAttempts})
+	if err != nil {
+		return err
+	}
+	return repository.redisClient.Set(ctx, repository.passwordResetOTPKey(email), record, expiration).Err()
+}
+
+func (repository *SessionRepository) VerifyPasswordResetOTP(ctx context.Context, email string, presentedCode string) (bool, error) {
+	encoded, err := repository.redisClient.Get(ctx, repository.passwordResetOTPKey(email)).Bytes()
+	if err == redis.Nil {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	var record passwordResetOTPRecord
+	if json.Unmarshal(encoded, &record) != nil {
+		_ = repository.redisClient.Del(ctx, repository.passwordResetOTPKey(email)).Err()
+		return false, errResetOTPExhausted
+	}
+
+	if subtle.ConstantTimeCompare([]byte(record.Code), []byte(presentedCode)) == 1 {
+		_ = repository.redisClient.Del(ctx, repository.passwordResetOTPKey(email)).Err()
+		return true, nil
+	}
+
+	record.Attempts--
+	if record.Attempts <= 0 {
+		_ = repository.redisClient.Del(ctx, repository.passwordResetOTPKey(email)).Err()
+		return false, errResetOTPExhausted
+	}
+	updated, err := json.Marshal(record)
+	if err == nil {
+		_ = repository.redisClient.Set(ctx, repository.passwordResetOTPKey(email), updated, 0).Err()
+	}
+	return false, nil
+}
+
+func (repository *SessionRepository) StorePasswordResetTicket(ctx context.Context, ticket string, email string, expiration time.Duration) error {
+	return repository.redisClient.Set(ctx, repository.passwordResetTicketKey(ticket), email, expiration).Err()
+}
+
+func (repository *SessionRepository) ConsumePasswordResetTicket(ctx context.Context, ticket string) (string, error) {
+	email, err := repository.redisClient.GetDel(ctx, repository.passwordResetTicketKey(ticket)).Result()
+	if err == redis.Nil {
+		return "", errors.New("invalid or expired password reset ticket")
+	}
+	if err != nil {
+		return "", err
+	}
+	return email, nil
+}
+
 func (repository *SessionRepository) StoreMFAChallenge(ctx context.Context, ticket string, userID string, expiration time.Duration) error {
 	if repository.redisClient == nil {
 		return errors.New("redis session store not configured")
@@ -309,6 +382,8 @@ type MemorySessionRepository struct {
 	families      map[string]*refreshFamily // familyID -> family
 	tokenToFamily map[string]string         // tokenHash -> familyID
 	mfaTickets    map[string]string         // ticket -> userID (single-use)
+	resetOTPs     map[string]*passwordResetOTPRecord
+	resetTickets  map[string]string // ticket -> email
 }
 
 func NewMemorySessionRepository() *MemorySessionRepository {
@@ -317,6 +392,8 @@ func NewMemorySessionRepository() *MemorySessionRepository {
 		families:      make(map[string]*refreshFamily),
 		tokenToFamily: make(map[string]string),
 		mfaTickets:    make(map[string]string),
+		resetOTPs:     make(map[string]*passwordResetOTPRecord),
+		resetTickets:  make(map[string]string),
 	}
 }
 
@@ -338,6 +415,56 @@ func (repo *MemorySessionRepository) ConsumeMFAChallenge(ctx context.Context, ti
 	}
 	delete(repo.mfaTickets, ticket)
 	return userID, nil
+}
+
+func (repo *MemorySessionRepository) StorePasswordResetOTP(ctx context.Context, email string, code string, maxAttempts int, expiration time.Duration) error {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+
+	repo.resetOTPs[email] = &passwordResetOTPRecord{Code: code, Attempts: maxAttempts}
+	return nil
+}
+
+func (repo *MemorySessionRepository) VerifyPasswordResetOTP(ctx context.Context, email string, presentedCode string) (bool, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+
+	record, exists := repo.resetOTPs[email]
+	if !exists {
+		return false, nil
+	}
+
+	if subtle.ConstantTimeCompare([]byte(record.Code), []byte(presentedCode)) == 1 {
+		delete(repo.resetOTPs, email)
+		return true, nil
+	}
+
+	record.Attempts--
+	if record.Attempts <= 0 {
+		delete(repo.resetOTPs, email)
+		return false, errResetOTPExhausted
+	}
+	return false, nil
+}
+
+func (repo *MemorySessionRepository) StorePasswordResetTicket(ctx context.Context, ticket string, email string, expiration time.Duration) error {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+
+	repo.resetTickets[ticket] = email
+	return nil
+}
+
+func (repo *MemorySessionRepository) ConsumePasswordResetTicket(ctx context.Context, ticket string) (string, error) {
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+
+	email, exists := repo.resetTickets[ticket]
+	if !exists {
+		return "", errors.New("invalid or expired password reset ticket")
+	}
+	delete(repo.resetTickets, ticket)
+	return email, nil
 }
 
 func (repo *MemorySessionRepository) StoreSession(ctx context.Context, userID string, tokenID string, expiration time.Duration) error {
