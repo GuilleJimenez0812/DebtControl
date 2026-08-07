@@ -37,13 +37,19 @@ func readRefreshCookie(ginContext *gin.Context) string {
 }
 
 type AuthHandler struct {
-	authUseCase ports.AuthUseCase
+	authUseCase         ports.AuthUseCase
+	registrationEnabled bool
 }
 
-func NewAuthHandler(authUseCase ports.AuthUseCase) *AuthHandler {
+func NewAuthHandler(authUseCase ports.AuthUseCase, registrationEnabled bool) *AuthHandler {
 	return &AuthHandler{
-		authUseCase: authUseCase,
+		authUseCase:         authUseCase,
+		registrationEnabled: registrationEnabled,
 	}
+}
+
+func (handler *AuthHandler) RegistrationStatus(ginContext *gin.Context) {
+	ginContext.JSON(http.StatusOK, gin.H{"registration_enabled": handler.registrationEnabled})
 }
 
 func (handler *AuthHandler) Register(ginContext *gin.Context) {

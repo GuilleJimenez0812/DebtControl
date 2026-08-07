@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase, allowedOrigins []string) *gin.Engine {
+func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase, allowedOrigins []string, registrationEnabled bool) *gin.Engine {
 	routerEngine := gin.Default()
 
 	routerEngine.Use(SecurityHeadersMiddleware())
@@ -23,20 +23,23 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 		MaxAge:           12 * time.Hour,
 	}))
 
-	authHandler := NewAuthHandler(authUseCase)
+	authHandler := NewAuthHandler(authUseCase, registrationEnabled)
 	debtHandler := NewDebtHandler(debtUseCase)
 	adminHandler := NewAdminHandler(adminUseCase)
 
 	apiGroup := routerEngine.Group("/api/v1")
 	{
-		authGroup := apiGroup.Group("/auth", CSRFMiddleware(true))
+		authGroup := apiGroup.Group("/auth")
 		{
-			authGroup.POST("/register", authHandler.Register)
-			authGroup.POST("/login", authHandler.Login)
-			authGroup.POST("/refresh", authHandler.Refresh)
-			authGroup.POST("/logout", authHandler.Logout)
-			authGroup.POST("/logout-everywhere", AuthMiddleware(authUseCase), authHandler.LogoutEverywhere)
-			authGroup.GET("/me", AuthMiddleware(authUseCase), authHandler.GetCurrentUser)
+			authGroup.GET("/registration-status", authHandler.RegistrationStatus)
+			if registrationEnabled {
+				authGroup.POST("/register", CSRFMiddleware(true), authHandler.Register)
+			}
+			authGroup.POST("/login", CSRFMiddleware(true), authHandler.Login)
+			authGroup.POST("/refresh", CSRFMiddleware(true), authHandler.Refresh)
+			authGroup.POST("/logout", CSRFMiddleware(true), authHandler.Logout)
+			authGroup.POST("/logout-everywhere", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.LogoutEverywhere)
+			authGroup.GET("/me", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.GetCurrentUser)
 		}
 
 		debtGroup := apiGroup.Group("/debts")

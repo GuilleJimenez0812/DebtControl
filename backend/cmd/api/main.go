@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	httpAdapter "debtcontrol/backend/internal/adapters/http"
@@ -24,6 +25,19 @@ func getEnvOrDefault(envKey string, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func getEnvBoolOrDefault(envKey string, defaultValue bool) bool {
+	raw := os.Getenv(envKey)
+	if raw == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		log.Printf("WARNING: %s has an invalid boolean value; using default %t", envKey, defaultValue)
+		return defaultValue
+	}
+	return parsed
 }
 
 func main() {
@@ -115,7 +129,7 @@ func main() {
 		"ALLOWED_ORIGINS",
 		"http://localhost:5173,http://localhost:3000,https://debtcontrol-1.onrender.com",
 	), ",")
-	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, allowedOrigins)
+	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, allowedOrigins, getEnvBoolOrDefault("REGISTRATION_ENABLED", false))
 
 	serverPort := getEnvOrDefault("PORT", "8080")
 	log.Printf("Server listening on http://localhost:%s", serverPort)

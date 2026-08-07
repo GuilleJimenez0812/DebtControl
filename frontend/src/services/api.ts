@@ -66,6 +66,11 @@ export interface ParseInvoiceResult {
 
 export const apiService = {
   // Auth
+  getRegistrationStatus: async (): Promise<{ registration_enabled: boolean }> => {
+    const response = await apiClient.get('/auth/registration-status');
+    return response.data;
+  },
+
   register: async (email: string, password: string, fullName: string) => {
     const response = await apiClient.post('/auth/register', { email, password, full_name: fullName });
     return response.data;

@@ -6,6 +6,7 @@ interface AuthModalProps {
   onClose: () => void;
   onLogin: (email: string, pass: string) => Promise<void>;
   onRegister: (email: string, pass: string, name: string) => Promise<void>;
+  registrationEnabled: boolean;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -13,6 +14,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   onLogin,
   onRegister,
+  registrationEnabled,
 }) => {
   const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
   const [email, setEmail] = useState<string>('');
@@ -133,19 +135,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
         </form>
 
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => {
-              setIsRegisterMode(!isRegisterMode);
-              setError('');
-            }}
-            className="text-xs text-indigo-400 hover:text-indigo-300 transition"
-          >
-            {isRegisterMode
-              ? 'Already have an account? Sign In'
-              : "Don't have an account? Register"}
-          </button>
-        </div>
+        {registrationEnabled && (
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => {
+                setIsRegisterMode(!isRegisterMode);
+                setError('');
+              }}
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition"
+            >
+              {isRegisterMode
+                ? 'Already have an account? Sign In'
+                : "Don't have an account? Register"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

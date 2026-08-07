@@ -69,6 +69,14 @@ const DashboardContent: React.FC = () => {
     });
   }, []);
 
+  const [registrationEnabled, setRegistrationEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    apiService.getRegistrationStatus().then((status) => {
+      setRegistrationEnabled(status.registration_enabled);
+    });
+  }, []);
+
   const { data: summary, isLoading, refetch } = useQuery({
     queryKey: ['dashboardSummary'],
     queryFn: apiService.getDashboardSummary,
@@ -295,6 +303,7 @@ const DashboardContent: React.FC = () => {
         onClose={() => setIsAuthOpen(false)}
         onLogin={handleLogin}
         onRegister={handleRegister}
+        registrationEnabled={registrationEnabled}
       />
 
       <AdminUserModal
