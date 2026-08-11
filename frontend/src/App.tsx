@@ -9,6 +9,7 @@ import { Sidebar, type NavKey } from './components/layout/Sidebar';
 import { SummaryCards } from './components/SummaryCards';
 import { DebtTable } from './components/DebtTable';
 import { PurchasesList } from './components/PurchasesList';
+import { ShippingPackages } from './components/ShippingPackages';
 import { PurchaseDetailModal } from './components/PurchaseDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthWall } from './components/AuthWall';
@@ -307,20 +308,23 @@ const DashboardContent: React.FC = () => {
                   )}
 
                   {activeTab === 'purchases' && (
-                    <PurchasesList
-                    purchases={summary?.recent_purchases || []}
-                    language={language}
-                    selectedPersonFilter={selectedPersonFilter}
-                    onPersonFilterChange={setSelectedPersonFilter}
-                    selectedPeriodFilter={selectedPeriodFilter}
-                    onPeriodFilterChange={setSelectedPeriodFilter}
-                    onSelectPurchase={(item) => setSelectedPurchaseForModal(item)}
-                  />
-                )}
-              </>
-            )}
-          </>
-        )}
+                    <>
+                      <PurchasesList
+                        purchases={summary?.recent_purchases || []}
+                        language={language}
+                        selectedPersonFilter={selectedPersonFilter}
+                        onPersonFilterChange={setSelectedPersonFilter}
+                        selectedPeriodFilter={selectedPeriodFilter}
+                        onPeriodFilterChange={setSelectedPeriodFilter}
+                        onSelectPurchase={(item) => setSelectedPurchaseForModal(item)}
+                      />
+<ShippingPackages packages={summary?.shipping_packages || []} language={language} />
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          )}
       </main>
 
       {drawerOpen && (
@@ -431,6 +435,7 @@ const DashboardContent: React.FC = () => {
       <NewPaymentModal
         person={selectedPersonForPayment}
         isOpen={!!selectedPersonForPayment}
+        language={language}
         onClose={() => setSelectedPersonForPayment(null)}
         onSubmit={async (payload) => {
           await paymentMutation.mutateAsync(payload);

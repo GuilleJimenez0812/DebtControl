@@ -1,78 +1,128 @@
 import React from 'react';
 import type { ShippingPackage } from '../types';
-import { Truck, CheckCircle2, AlertCircle, Plane } from 'lucide-react';
+import type { Language } from '../i18n/translations';
+import { translations } from '../i18n/translations';
+import { Truck, CheckCircle2, AlertCircle, Plane, PackageOpen } from 'lucide-react';
+import { Badge } from './ui/Badge';
 
 interface ShippingPackagesProps {
   packages: ShippingPackage[];
+  language: Language;
 }
 
-export const ShippingPackages: React.FC<ShippingPackagesProps> = ({ packages }) => {
+const money = (n: number) => `$${n.toFixed(2)}`;
+
+const statusBadge = (
+  pkg: ShippingPackage,
+  t: Record<string, string>,
+  lang: Language
+): React.ReactNode => {
+  if (pkg.personally_received) {
+    return (
+      <Badge tone="success">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        <span>{lang === 'es' ? 'Personal' : 'Personally'} · {t.received}</span>
+      </Badge>
+    );
+  }
+  if (pkg.warehouse_received) {
+    return (
+      <Badge tone="success">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        <span>{t.received}</span>
+      </Badge>
+    );
+  }
   return (
-    <div className="glass-panel rounded-2xl p-6 mb-8">
+    <Badge tone="neutral">
+      <AlertCircle className="h-3.5 w-3.5" />
+      <span>{t.inTransit}</span>
+    </Badge>
+  );
+};
+
+export const ShippingPackages: React.FC<ShippingPackagesProps> = ({ packages, language }) => {
+  const t = translations[language];
+
+  if (packages.length === 0) return null;
+
+  return (
+    <div className="mb-8 rounded-2xl border border-line bg-panel p-6 shadow-apple dark:border-line-dark dark:bg-panel dark:shadow-apple-dark">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-            <Truck className="w-5 h-5 text-indigo-400" />
-            <span>Shipping & Package Tracking (Control de Envíos)</span>
+          <h2 className="flex items-center gap-2 text-lg font-bold text-ink dark:text-ink-dark">
+            <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent/10 text-accent dark:bg-accent/20">
+              <Truck className="h-5 w-5" />
+            </span>
+            <span>{t.saveShippingLabel}</span>
           </h2>
-          <p className="text-xs text-slate-400">Air dispatch schedules and warehouse receipt logs</p>
+          <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.saveShippingDesc}</p>
         </div>
+        <Badge tone="accent" className="hidden sm:inline-flex">
+          <PackageOpen className="h-3.5 w-3.5" />
+          <span>{packages.length}</span>
+        </Badge>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              <th className="py-3 px-4">Order Number</th>
-              <th className="py-3 px-4">Tracking ID</th>
-              <th className="py-3 px-4">Item Description</th>
-              <th className="py-3 px-4">Shipping Cost</th>
-              <th className="py-3 px-4">Warehouse Status</th>
-              <th className="py-3 px-4">Dispatch Flight</th>
+            <tr className="border-b border-line text-xs font-semibold text-ink-tertiary uppercase tracking-wider dark:border-line-dark dark:text-ink-tertiary-dark">
+              <th className="py-3 px-2">{t.orderNumberCol}</th>
+              <th className="py-3 px-2">{t.trackingIdCol}</th>
+              <th className="py-3 px-2">{t.itemDescriptionCol}</th>
+              <th className="py-3 px-2">{t.shippingCostCol}</th>
+              <th className="py-3 px-2">{t.warehouseStatusCol}</th>
+              <th className="py-3 px-2">{t.dispatchFlightCol}</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 text-sm">
+          <tbody className="divide-y divide-line text-sm dark:divide-line-dark">
             {packages.map((pkg) => (
-              <tr key={pkg.id} className="hover:bg-slate-800/40 transition">
-                <td className="py-3.5 px-4 font-mono text-xs text-slate-300">
-                  {pkg.order_number}
-                </td>
-                <td className="py-3.5 px-4 font-mono text-xs text-indigo-300">
-                  {pkg.tracking_number || 'N/A'}
-                </td>
-                <td className="py-3.5 px-4 font-medium text-slate-200">
-                  {pkg.item_description}
-                </td>
-                <td className="py-3.5 px-4 font-mono text-slate-300">
-                  ${pkg.shipping_cost.toFixed(2)}
-                </td>
-                <td className="py-3.5 px-4">
-                  {pkg.warehouse_received ? (
-                    <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Received</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      <span>In Transit</span>
-                    </span>
-                  )}
-                </td>
-                <td className="py-3.5 px-4 font-medium text-slate-300">
+              <tr key={pkg.id} className="hover:bg-black/[0.03] transition dark:hover:bg-white/[0.04]">
+                <td className="py-3.5 px-2 font-mono text-xs text-ink-secondary dark:text-ink-secondary-dark">{pkg.order_number}</td>
+                <td className="py-3.5 px-2 font-mono text-xs font-semibold text-accent">{pkg.tracking_number || 'N/A'}</td>
+                <td className="py-3.5 px-2 font-medium text-ink dark:text-ink-dark">{pkg.item_description}</td>
+                <td className="py-3.5 px-2 font-mono tabular-nums text-ink-secondary dark:text-ink-secondary-dark">{money(pkg.shipping_cost)}</td>
+                <td className="py-3.5 px-2">{statusBadge(pkg, t, language)}</td>
+                <td className="py-3.5 px-2">
                   {pkg.dispatch_date ? (
-                    <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                      <Plane className="w-3.5 h-3.5" />
+                    <Badge tone="accent">
+                      <Plane className="h-3.5 w-3.5" />
                       <span>{pkg.dispatch_date}</span>
-                    </span>
+                    </Badge>
                   ) : (
-                    <span className="text-slate-500 text-xs">Pending</span>
+                    <span className="text-xs text-ink-muted dark:text-ink-muted-dark">{t.pending}</span>
                   )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden grid grid-cols-1 gap-3">
+        {packages.map((pkg) => (
+          <div key={pkg.id} className="rounded-xl border border-line bg-panel p-4 dark:border-line-dark dark:bg-panel">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="font-mono text-xs font-bold text-accent">{pkg.tracking_number || 'N/A'}</span>
+              {statusBadge(pkg, t, language)}
+            </div>
+            <p className="text-sm font-semibold text-ink dark:text-ink-dark">{pkg.item_description}</p>
+            <p className="text-xs text-ink-tertiary mt-0.5 font-mono dark:text-ink-tertiary-dark">{pkg.order_number}</p>
+            <div className="mt-3 flex items-center justify-between border-t border-line pt-2 dark:border-line-dark">
+              <span className="text-[11px] text-ink-tertiary dark:text-ink-tertiary-dark">{t.shippingCostCol}</span>
+              <span className="font-mono tabular-nums text-sm font-bold text-ink dark:text-ink-dark">{money(pkg.shipping_cost)}</span>
+            </div>
+            {pkg.dispatch_date && (
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-[11px] text-ink-tertiary dark:text-ink-tertiary-dark">{t.dispatchFlightCol}</span>
+                <span className="text-xs font-semibold text-accent">{pkg.dispatch_date}</span>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

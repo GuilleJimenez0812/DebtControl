@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Person } from '../types';
-import { X, CreditCard } from 'lucide-react';
+import type { Language } from '../i18n/translations';
+import { translations } from '../i18n/translations';
+import { CreditCard, Zap, Wallet } from 'lucide-react';
+import { Modal } from './ui/Modal';
+import { Input } from './ui/Input';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
+import { useToast } from './ui/Toast';
 
 interface NewPaymentModalProps {
   person: Person | null;
   isOpen: boolean;
+  language: Language;
   onClose: () => void;
   onSubmit: (payload: { person_id: string; amount_paid: number; notes: string }) => Promise<void>;
 }
@@ -12,17 +20,34 @@ interface NewPaymentModalProps {
 export const NewPaymentModal: React.FC<NewPaymentModalProps> = ({
   person,
   isOpen,
+  language,
   onClose,
   onSubmit,
 }) => {
+  const t = translations[language];
+  const { toast } = useToast();
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [notes, setNotes] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
+  const money = (n: number) => `$${n.toFixed(2)}`;
+
+  useEffect(() => {
+    if (isOpen) {
+      setAmountPaid(0);
+      setNotes('');
+      setLoading(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen || !person) return null;
+
+  const balance = person.balance > 0 ? person.balance : 0;
+  const isPartial = amountPaid > 0 && amountPaid < balance;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (amountPaid <= 0) return;
     setLoading(true);
     try {
       await onSubmit({
@@ -30,66 +55,92 @@ export const NewPaymentModal: React.FC<NewPaymentModalProps> = ({
         amount_paid: Number(amountPaid),
         notes: notes,
       });
+      toast('success', t.paymentSaved);
       onClose();
     } catch {
-      alert('Failed to record payment');
+      toast('error', t.paymentFailed);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="glass-panel w-full max-w-md p-6 rounded-2xl border border-slate-700 shadow-2xl relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-          <X className="w-5 h-5" />
-        </button>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      width="sm"
+      title={
+        <span className="flex items-center gap-2">
+          <CreditCard className="h-5 w-5 text-success" />
+          <span>{t.recordPaymentFor} {person.name}</span>
+        </span>
+      }
+      subtitle={
+        <span>
+          {t.currentBalance}:{' '}
+          <span className="font-bold text-warning font-mono tabular-nums">${balance.toFixed(2)}</span>
+        </span>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {isPartial && (
+          <Badge tone="accent">
+            <Wallet className="h-3.5 w-3.5" />
+            <span>{t.partialPayment}</span>
+          </Badge>
+        )}
 
-        <h3 className="text-xl font-bold text-white mb-1 flex items-center space-x-2">
-          <CreditCard className="w-5 h-5 text-emerald-400" />
-          <span>Record Payment for {person.name}</span>
-        </h3>
-        <p className="text-xs text-slate-400 mb-4">
-          Current Balance: <span className="font-bold text-amber-300">${person.balance.toFixed(2)}</span>
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Amount Paid ($)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max={person.balance > 0 ? person.balance : undefined}
-              required
-              value={amountPaid}
-              onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
-            />
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">
+            {t.amountPaid}
+          </label>
+          <Input
+            type="number"
+            step="0.01"
+            min="0.01"
+            max={balance > 0 ? balance : undefined}
+            required
+            value={amountPaid}
+            onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
+            className="w-full font-mono tabular-nums"
+            placeholder={t.paymentAmountPlaceholder}
+          />
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[11px] text-ink-tertiary dark:text-ink-tertiary-dark">
+              {t.paymentMax}: {money(balance)}
+            </span>
+            {balance > 0 && (
+              <button
+                type="button"
+                onClick={() => setAmountPaid(balance)}
+                className="inline-flex items-center gap-1 rounded-[8px] bg-accent/10 px-2 py-1 text-[11px] font-semibold text-accent transition hover:bg-accent/20"
+              >
+                <Zap className="h-3 w-3" />
+                <span>{t.payFullBalance}</span>
+              </button>
+            )}
           </div>
+        </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Notes / Reference (Optional)</label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Bank Transfer or Cash"
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">
+            {t.notesReference}
+          </label>
+          <Input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={t.bankTransferPlaceholder}
+            className="w-full"
+          />
+        </div>
 
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition shadow-lg shadow-emerald-600/20"
-            >
-              {loading ? 'Processing...' : 'Confirm Payment'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="pt-2">
+          <Button type="submit" variant="success" disabled={loading || amountPaid <= 0} className="w-full">
+            {loading ? t.processing : t.confirmPayment}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };
