@@ -377,6 +377,7 @@ const DashboardContent: React.FC = () => {
         isOpen={isAdminOpen}
         usersWithPersons={adminUsers || []}
         allPersons={summary?.persons || []}
+        language={language}
         onClose={() => setIsAdminOpen(false)}
         onCreateUser={async (payload) => {
           await createAdminUserMutation.mutateAsync(payload);

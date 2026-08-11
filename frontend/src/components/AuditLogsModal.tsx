@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { X, ShieldAlert, Clock, User, Activity, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ShieldAlert, Clock, User, Activity, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import type { Language } from '../i18n/translations';
+import { translations } from '../i18n/translations';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
+import { Loader2 } from 'lucide-react';
 
 interface AuditLogsModalProps {
   isOpen: boolean;
@@ -21,7 +26,15 @@ interface AuditLog {
   created_at: string;
 }
 
+const actionTone = (action: string): 'success' | 'accent' | 'danger' | 'neutral' => {
+  if (action === 'CREATE') return 'success';
+  if (action === 'UPDATE') return 'accent';
+  if (action === 'DELETE') return 'danger';
+  return 'neutral';
+};
+
 export const AuditLogsModal: React.FC<AuditLogsModalProps> = ({ isOpen, onClose, language }) => {
+  const t = translations[language];
   const [page, setPage] = useState(0);
   const limit = 20;
 
@@ -33,87 +46,74 @@ export const AuditLogsModal: React.FC<AuditLogsModalProps> = ({ isOpen, onClose,
 
   const logs: AuditLog[] = data?.logs || [];
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="glass-panel w-full max-w-4xl p-6 rounded-3xl border border-slate-700 shadow-2xl relative max-h-[90vh] flex flex-col">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition">
-          <X className="w-5 h-5" />
-        </button>
-
-        <h3 className="text-xl font-bold text-white mb-2 flex items-center space-x-2">
-          <ShieldAlert className="w-5 h-5 text-rose-400" />
-          <span>Audit Logs</span>
-        </h3>
-        <p className="text-xs text-slate-400 mb-4">
-          Tracking all administrative and mutation actions in the platform.
-        </p>
-
-        <div className="flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-800/80 text-xs font-semibold text-slate-300">
-                <th className="p-3 border-b border-slate-700 whitespace-nowrap"><div className="flex items-center space-x-1"><Clock className="w-3 h-3" /><span>Time</span></div></th>
-                <th className="p-3 border-b border-slate-700 whitespace-nowrap"><div className="flex items-center space-x-1"><User className="w-3 h-3" /><span>User</span></div></th>
-                <th className="p-3 border-b border-slate-700 whitespace-nowrap"><div className="flex items-center space-x-1"><Activity className="w-3 h-3" /><span>Action</span></div></th>
-                <th className="p-3 border-b border-slate-700 whitespace-nowrap"><div className="flex items-center space-x-1"><FileText className="w-3 h-3" /><span>Details</span></div></th>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      width="lg"
+      title={
+        <span className="flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5 text-danger" />
+          <span>{t.auditLogsTitle}</span>
+        </span>
+      }
+      subtitle={t.auditLogsDesc}
+    >
+      <div className="overflow-auto rounded-[10px] border border-line bg-black/[0.02] dark:border-line-dark dark:bg-white/[0.02]">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-black/[0.03] text-xs font-semibold text-ink-tertiary dark:bg-white/[0.03] dark:text-ink-tertiary-dark">
+              <th className="p-3 whitespace-nowrap border-b border-line dark:border-line-dark"><div className="flex items-center gap-1"><Clock className="h-3 w-3" /><span>{t.timeCol}</span></div></th>
+              <th className="p-3 whitespace-nowrap border-b border-line dark:border-line-dark"><div className="flex items-center gap-1"><User className="h-3 w-3" /><span>{t.userCol}</span></div></th>
+              <th className="p-3 whitespace-nowrap border-b border-line dark:border-line-dark"><div className="flex items-center gap-1"><Activity className="h-3 w-3" /><span>{t.actionCol}</span></div></th>
+              <th className="p-3 whitespace-nowrap border-b border-line dark:border-line-dark"><div className="flex items-center gap-1"><FileText className="h-3 w-3" /><span>{t.detailsCol}</span></div></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line dark:divide-line-dark">
+            {isLoading ? (
+              <tr>
+                <td colSpan={4} className="p-8 text-center text-sm text-ink-muted dark:text-ink-muted-dark">
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                    {t.loadingLogs}
+                  </span>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500 text-sm">Loading logs...</td>
+            ) : logs.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="p-8 text-center text-sm text-ink-muted dark:text-ink-muted-dark">{t.noLogsFound}</td>
+              </tr>
+            ) : (
+              logs.map((log) => (
+                <tr key={log.id} className="text-xs transition hover:bg-black/[0.02] dark:hover:bg-white/[0.03]">
+                  <td className="p-3 whitespace-nowrap text-ink-secondary dark:text-ink-secondary-dark">
+                    {new Date(log.created_at).toLocaleString(language === 'es' ? 'es-ES' : 'en-US')}
+                  </td>
+                  <td className="p-3 font-semibold text-accent">{log.user_email}</td>
+                  <td className="p-3">
+                    <Badge tone={actionTone(log.action)} className="uppercase">
+                      {log.action} {log.entity_type}
+                    </Badge>
+                  </td>
+                  <td className="max-w-xs break-words p-3 text-ink-secondary dark:text-ink-secondary-dark">{log.details}</td>
                 </tr>
-              ) : logs.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-slate-500 text-sm">No logs found.</td>
-                </tr>
-              ) : (
-                logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-800/30 transition border-b border-slate-800 text-xs">
-                    <td className="p-3 text-slate-400 whitespace-nowrap">
-                      {new Date(log.created_at).toLocaleString(language === 'es' ? 'es-ES' : 'en-US')}
-                    </td>
-                    <td className="p-3 text-indigo-300">{log.user_email}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        log.action === 'CREATE' ? 'bg-emerald-500/20 text-emerald-400' :
-                        log.action === 'UPDATE' ? 'bg-blue-500/20 text-blue-400' :
-                        log.action === 'DELETE' ? 'bg-rose-500/20 text-rose-400' :
-                        'bg-slate-500/20 text-slate-400'
-                      }`}>
-                        {log.action} {log.entity_type}
-                      </span>
-                    </td>
-                    <td className="p-3 text-slate-300 break-words max-w-xs">{log.details}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex items-center justify-between mt-4">
-          <button
-            onClick={() => setPage(p => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className="flex items-center space-x-1 text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-white disabled:opacity-50 hover:bg-slate-700 transition"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Previous</span>
-          </button>
-          <span className="text-xs text-slate-400">Page {page + 1}</span>
-          <button
-            onClick={() => setPage(p => p + 1)}
-            disabled={logs.length < limit}
-            className="flex items-center space-x-1 text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-white disabled:opacity-50 hover:bg-slate-700 transition"
-          >
-            <span>Next</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
-    </div>
+
+      <div className="mt-4 flex items-center justify-between">
+        <Button size="sm" variant="secondary" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
+          <ChevronLeft className="h-4 w-4" />
+          <span>{t.previous}</span>
+        </Button>
+        <span className="text-xs text-ink-muted dark:text-ink-muted-dark">{t.page} {page + 1}</span>
+        <Button size="sm" variant="secondary" onClick={() => setPage((p) => p + 1)} disabled={logs.length < limit}>
+          <span>{t.next}</span>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </Modal>
   );
 };

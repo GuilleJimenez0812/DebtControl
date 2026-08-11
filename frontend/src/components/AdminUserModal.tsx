@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
 import type { Person } from '../types';
 import type { UserWithPersons } from '../services/api';
-import { X, UserPlus, Users, CheckSquare, Square, Save } from 'lucide-react';
+import type { Language } from '../i18n/translations';
+import { translations } from '../i18n/translations';
+import { UserPlus, Users, CheckSquare, Square, Save } from 'lucide-react';
+import { Modal } from './ui/Modal';
+import { Input } from './ui/Input';
+import { Button } from './ui/Button';
+import { Select } from './ui/Select';
+import { Badge } from './ui/Badge';
+import { useToast } from './ui/Toast';
 
 interface AdminUserModalProps {
   isOpen: boolean;
   usersWithPersons: UserWithPersons[];
   allPersons: Person[];
+  language: Language;
   onClose: () => void;
   onCreateUser: (payload: { email: string; password: string; full_name: string; role: string }) => Promise<void>;
   onAssignPersons: (userId: string, personIds: string[]) => Promise<void>;
@@ -16,10 +25,13 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
   isOpen,
   usersWithPersons,
   allPersons,
+  language,
   onClose,
   onCreateUser,
   onAssignPersons,
 }) => {
+  const t = translations[language];
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [selectedUser, setSelectedUser] = useState<UserWithPersons | null>(null);
   const [selectedPersonIds, setSelectedPersonIds] = useState<string[]>([]);
@@ -31,19 +43,15 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
-  if (!isOpen) return null;
-
   const handleSelectUserToAssign = (uwp: UserWithPersons) => {
     setSelectedUser(uwp);
     setSelectedPersonIds(uwp.assigned_person_ids || []);
   };
 
   const handleTogglePerson = (personId: string) => {
-    if (selectedPersonIds.includes(personId)) {
-      setSelectedPersonIds(selectedPersonIds.filter((id) => id !== personId));
-    } else {
-      setSelectedPersonIds([...selectedPersonIds, personId]);
-    }
+    setSelectedPersonIds((prev) =>
+      prev.includes(personId) ? prev.filter((id) => id !== personId) : [...prev, personId]
+    );
   };
 
   const handleSaveAssignments = async () => {
@@ -52,8 +60,9 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
     try {
       await onAssignPersons(selectedUser.user.id, selectedPersonIds);
       setSelectedUser(null);
+      toast('success', t.savedPermissions);
     } catch {
-      setError('Failed to update person assignments.');
+      toast('error', t.failedAssignments);
     } finally {
       setLoading(false);
     }
@@ -70,11 +79,12 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
       setFullName('');
       setRole('user');
       setActiveTab('list');
+      toast('success', t.userCreated);
     } catch (err: unknown) {
-      if (err instanceof Error) {
+      if (err instanceof Error && err.message) {
         setError(err.message);
       } else {
-        setError('Failed to create user account.');
+        setError(t.failedCreateUser);
       }
     } finally {
       setLoading(false);
@@ -82,218 +92,172 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="glass-panel w-full max-w-2xl p-6 rounded-3xl border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition">
-          <X className="w-5 h-5" />
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      width="lg"
+      title={
+        <span className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-accent" />
+          <span>{t.adminTitle}</span>
+        </span>
+      }
+      subtitle={t.adminDesc}
+    >
+      {/* Tab Switcher */}
+      <div className="mb-5 flex gap-1 rounded-[10px] border border-line bg-black/[0.03] p-1 dark:border-line-dark dark:bg-white/[0.04]">
+        <button
+          onClick={() => {
+            setActiveTab('list');
+            setSelectedUser(null);
+          }}
+          className={`flex-1 rounded-[8px] px-4 py-2 text-xs font-bold transition ${
+            activeTab === 'list' ? 'bg-accent text-white shadow-sm' : 'text-ink-muted hover:text-ink dark:text-ink-muted-dark dark:hover:text-ink-dark'
+          }`}
+        >
+          {t.manageUserPermissions}
         </button>
+        <button
+          onClick={() => setActiveTab('create')}
+          className={`flex-1 rounded-[8px] px-4 py-2 text-xs font-bold transition ${
+            activeTab === 'create' ? 'bg-accent text-white shadow-sm' : 'text-ink-muted hover:text-ink dark:text-ink-muted-dark dark:hover:text-ink-dark'
+          }`}
+        >
+          {t.createNewUser}
+        </button>
+      </div>
 
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="p-3 bg-indigo-600/20 rounded-2xl border border-indigo-500/30 text-indigo-400">
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-white">Admin User & Permission Management</h3>
-            <p className="text-xs text-slate-400">Create user accounts and assign person debt visibility</p>
-          </div>
+      {error && (
+        <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-semibold text-danger">
+          {error}
         </div>
+      )}
 
-        {/* Tab Switcher */}
-        <div className="flex space-x-2 border-b border-slate-800 mb-6 pb-2">
-          <button
-            onClick={() => {
-              setActiveTab('list');
-              setSelectedUser(null);
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'list' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Manage User Permissions
-          </button>
-          <button
-            onClick={() => setActiveTab('create')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === 'create' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Create New User
-          </button>
-        </div>
+      {activeTab === 'list' && (
+        <div>
+          {!selectedUser ? (
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-ink-tertiary dark:text-ink-tertiary-dark">{t.systemUsers}</h4>
+              <div className="divide-y divide-line dark:divide-line-dark">
+                {usersWithPersons.length === 0 && (
+                  <p className="py-8 text-center text-sm text-ink-muted dark:text-ink-muted-dark">{t.noResultsFound}</p>
+                )}
+                {usersWithPersons.map((uwp) => (
+                  <div key={uwp.user.id} className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="flex items-center gap-2 text-sm font-semibold text-ink dark:text-ink-dark">
+                        <span>{uwp.user.full_name}</span>
+                        <Badge tone={uwp.user.role === 'admin' ? 'accent' : 'neutral'} className="uppercase">
+                          {uwp.user.role}
+                        </Badge>
+                      </p>
+                      <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{uwp.user.email}</p>
+                      <p className="mt-1 text-[11px] text-ink-secondary dark:text-ink-secondary-dark">
+                        {t.assignedPersons}{' '}
+                        {uwp.user.role === 'admin'
+                          ? t.allPersonsAdmin
+                          : uwp.assigned_persons.length > 0
+                          ? uwp.assigned_persons.map((p) => p.name).join(', ')
+                          : t.noneNoAccess}
+                      </p>
+                    </div>
 
-        {error && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
-            {error}
-          </div>
-        )}
+                    {uwp.user.role !== 'admin' && (
+                      <Button size="sm" variant="secondary" onClick={() => handleSelectUserToAssign(uwp)}>
+                        {t.editAccess}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 rounded-2xl border border-line bg-panel p-4 dark:border-line-dark dark:bg-panel">
+              <div className="flex items-center justify-between border-b border-line pb-3 dark:border-line-dark">
+                <div>
+                  <h4 className="text-sm font-bold text-ink dark:text-ink-dark">{t.assignPersonsTo} {selectedUser.user.full_name}</h4>
+                  <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{selectedUser.user.email}</p>
+                </div>
+                <button onClick={() => setSelectedUser(null)} className="text-xs font-semibold text-accent hover:text-accent-hover dark:hover:text-accent-hover-dark">
+                  {t.backToList}
+                </button>
+              </div>
 
-        {activeTab === 'list' && (
-          <div>
-            {!selectedUser ? (
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">System Users</h4>
-                <div className="divide-y divide-slate-800">
-                  {usersWithPersons.map((uwp) => (
-                    <div key={uwp.user.id} className="py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-white flex items-center space-x-2">
-                          <span>{uwp.user.full_name}</span>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase ${
-                              uwp.user.role === 'admin'
-                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                                : 'bg-slate-800 text-slate-400 border border-slate-700'
-                            }`}
-                          >
-                            {uwp.user.role}
-                          </span>
-                        </p>
-                        <p className="text-xs text-slate-400">{uwp.user.email}</p>
-                        <p className="text-[11px] text-indigo-300 mt-1">
-                          Assigned Persons:{' '}
-                          {uwp.user.role === 'admin'
-                            ? 'All Persons (Admin)'
-                            : uwp.assigned_persons.length > 0
-                            ? uwp.assigned_persons.map((p) => p.name).join(', ')
-                            : 'None (No person access)'}
-                        </p>
-                      </div>
-
-                      {uwp.user.role !== 'admin' && (
-                        <button
-                          onClick={() => handleSelectUserToAssign(uwp)}
-                          className="px-3 py-1.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 text-xs font-semibold border border-indigo-500/20 transition"
-                        >
-                          Edit Access
-                        </button>
+              <div className="space-y-2">
+                <p className="mb-2 text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.selectPersonsView}</p>
+                {allPersons.map((person) => {
+                  const isChecked = selectedPersonIds.includes(person.id);
+                  return (
+                    <div
+                      key={person.id}
+                      onClick={() => handleTogglePerson(person.id)}
+                      className={`flex items-center justify-between rounded-[10px] border p-3 transition cursor-pointer ${
+                        isChecked
+                          ? 'border-accent/50 bg-accent/10 text-ink dark:text-ink-dark'
+                          : 'border-line text-ink-secondary hover:border-accent/30 dark:border-line-dark dark:text-ink-secondary-dark'
+                      }`}
+                    >
+                      <span className="text-sm font-semibold">{person.name}</span>
+                      {isChecked ? (
+                        <CheckSquare className="h-5 w-5 text-accent" />
+                      ) : (
+                        <Square className="h-5 w-5 text-ink-muted dark:text-ink-muted-dark" />
                       )}
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            ) : (
-              <div className="glass-card p-4 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div>
-                    <h4 className="text-sm font-bold text-white">Assign Persons to {selectedUser.user.full_name}</h4>
-                    <p className="text-xs text-slate-400">{selectedUser.user.email}</p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedUser(null)}
-                    className="text-xs text-slate-400 hover:text-white"
-                  >
-                    Back to List
-                  </button>
-                </div>
 
-                <div className="space-y-2">
-                  <p className="text-xs text-slate-300 font-semibold mb-2">Select Persons this user can view:</p>
-                  {allPersons.map((person) => {
-                    const isChecked = selectedPersonIds.includes(person.id);
-                    return (
-                      <div
-                        key={person.id}
-                        onClick={() => handleTogglePerson(person.id)}
-                        className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition ${
-                          isChecked
-                            ? 'bg-indigo-600/10 border-indigo-500/40 text-white'
-                            : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                        }`}
-                      >
-                        <span className="text-sm font-semibold">{person.name}</span>
-                        {isChecked ? (
-                          <CheckSquare className="w-5 h-5 text-indigo-400" />
-                        ) : (
-                          <Square className="w-5 h-5 text-slate-600" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-3 border-t border-slate-800">
-                  <button
-                    onClick={() => setSelectedUser(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveAssignments}
-                    disabled={loading}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/20 transition flex items-center space-x-1"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{loading ? 'Saving...' : 'Save Permissions'}</span>
-                  </button>
-                </div>
+              <div className="flex justify-end gap-2 border-t border-line pt-3 dark:border-line-dark">
+                <Button size="sm" variant="ghost" onClick={() => setSelectedUser(null)}>
+                  {t.cancel}
+                </Button>
+                <Button size="sm" onClick={handleSaveAssignments} disabled={loading}>
+                  <Save className="h-3.5 w-3.5" />
+                  <span>{loading ? t.saving : t.savePermissions}</span>
+                </Button>
               </div>
-            )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'create' && (
+        <form onSubmit={handleCreateUserSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.fullName}</label>
+            <Input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="User Full Name" className="w-full" />
           </div>
-        )}
 
-        {activeTab === 'create' && (
-          <form onSubmit={handleCreateUserSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name</label>
-              <input
-                type="text"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="User Full Name"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white"
-              />
-            </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.emailAddress}</label>
+            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" className="w-full" />
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@example.com"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white"
-              />
-            </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.password}</label>
+            <Input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full" />
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white"
-              />
-            </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.userRole}</label>
+            <Select
+              value={role}
+              onValueChange={setRole}
+              options={[
+                { value: 'user', label: t.normalUserRole },
+                { value: 'admin', label: t.adminRole },
+              ]}
+              className="w-full"
+            />
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">User Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white font-semibold"
-              >
-                <option value="user">Normal User (Access limited to assigned persons)</option>
-                <option value="admin">Administrator (Full global access)</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-sm font-bold text-white shadow-xl shadow-indigo-600/20 transition flex items-center justify-center space-x-2"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>{loading ? 'Creating Account...' : 'Create Account'}</span>
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
+          <Button type="submit" disabled={loading} className="w-full">
+            <UserPlus className="h-4 w-4" />
+            <span>{loading ? t.creatingAccount : t.createAccount}</span>
+          </Button>
+        </form>
+      )}
+    </Modal>
   );
 };
