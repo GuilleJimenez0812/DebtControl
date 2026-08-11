@@ -422,6 +422,10 @@ const DashboardContent: React.FC = () => {
         onSubmit={async (payload) => {
           await purchaseMutation.mutateAsync(payload);
         }}
+        onAfterSave={(personName) => {
+          const person = (summary?.persons || []).find((p) => p.name === personName);
+          if (person) setSelectedPersonForPayment(person);
+        }}
       />
 
       <NewPaymentModal

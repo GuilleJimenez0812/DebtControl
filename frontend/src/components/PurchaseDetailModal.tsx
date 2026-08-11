@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { PurchaseItem, ShippingPackage, Person } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { X, FileText, Edit2, Save, Package, Eye, UserCog, Trash2 } from 'lucide-react';
+import { FileText, Edit2, Save, Package, Eye, UserCog, Trash2, Plus } from 'lucide-react';
+import { Modal } from './ui/Modal';
+import { Input } from './ui/Input';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
 
 interface PurchaseDetailModalProps {
   purchase: PurchaseItem | null;
@@ -19,6 +23,8 @@ interface PurchaseDetailModalProps {
   onReassignPurchase?: (purchaseId: string, personId: string) => Promise<void>;
   onDeletePurchase?: (purchaseId: string) => Promise<void>;
 }
+
+const money = (n: number) => `$${n.toFixed(2)}`;
 
 export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   purchase,
@@ -61,6 +67,21 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [isSubmittingDelete, setIsSubmittingDelete] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen && purchase) {
+      setItemAmount(purchase.item_amount);
+      setTaxAmount(purchase.tax_amount);
+      setShippingCost(purchase.shipping_cost);
+      setInvoiceUrl(purchase.invoice_url || '');
+      setIsEditingPurchase(false);
+      setEditingPkgId(null);
+      setIsAddingTracking(false);
+      setIsReassigning(false);
+      setShowDeleteConfirm(false);
+      setActionError('');
+    }
+  }, [isOpen, purchase]);
 
   if (!isOpen || !purchase) return null;
 
@@ -151,413 +172,342 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="glass-panel w-full max-w-2xl p-6 rounded-3xl border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition">
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="p-3 bg-indigo-600/20 rounded-2xl border border-indigo-500/30 text-indigo-400">
-            <Package className="w-6 h-6" />
-          </div>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      width="lg"
+      title={
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-accent/10 text-accent dark:bg-accent/20">
+            <Package className="h-5 w-5" />
+          </span>
           <div>
-            <h3 className="text-xl font-bold text-white">{purchase.description}</h3>
-            <p className="text-xs text-slate-400 font-mono">
-              Order: {purchase.order_number || 'N/A'} • Person: <span className="text-indigo-300 font-semibold">{purchase.person_name}</span>
+            <h3 className="text-lg font-bold text-ink dark:text-ink-dark">{purchase.description}</h3>
+            <p className="text-xs text-ink-tertiary font-mono dark:text-ink-tertiary-dark">
+              {language === 'es' ? 'Orden' : 'Order'}: {purchase.order_number || 'N/A'} • {t.person}: <span className="font-semibold text-accent">{purchase.person_name}</span>
             </p>
           </div>
         </div>
-
-        {/* Purchase Amounts Section */}
-        <div className="glass-card p-4 rounded-2xl mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Cost Breakdown & Invoice</span>
-            {isAdmin && (
-              !isEditingPurchase ? (
-                <button
-                  onClick={() => {
-                    setItemAmount(purchase.item_amount);
-                    setTaxAmount(purchase.tax_amount);
-                    setShippingCost(purchase.shipping_cost);
-                    setInvoiceUrl(purchase.invoice_url || '');
-                    setIsEditingPurchase(true);
-                  }}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 font-semibold"
-                >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  <span>Edit Amounts</span>
-                </button>
-              ) : (
-                <button
-                  onClick={handleSavePurchase}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 font-semibold bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save Purchase</span>
-                </button>
-              )
-            )}
-          </div>
-
-          {!isEditingPurchase ? (
-            <div className="grid grid-cols-4 gap-3 text-center border-t border-slate-800 pt-3">
-              <div>
-                <p className="text-xs text-slate-400">{t.itemAmount}</p>
-                <p className="text-sm font-bold font-mono text-slate-200">${purchase.item_amount.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">{t.taxAmount}</p>
-                <p className="text-sm font-bold font-mono text-slate-300">${purchase.tax_amount.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400">{t.shippingCost}</p>
-                <p className="text-sm font-bold font-mono text-slate-300">${purchase.shipping_cost.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-indigo-400 font-semibold">{t.totalCost}</p>
-                <p className="text-base font-extrabold font-mono text-indigo-300">${purchase.total_cost.toFixed(2)}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3 pt-2">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">{t.itemAmount}</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={itemAmount}
-                  onChange={(e) => setItemAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">{t.taxAmount}</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={taxAmount}
-                  onChange={(e) => setTaxAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white font-mono"
-                />
-              </div>
-                  <div>
-                    <label className="block text-slate-400 mb-1">{t.shippingCost || 'Shipping ($)'}</label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        disabled
-                        value={shippingCost}
-                        className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl p-2 text-xs text-slate-500 font-mono cursor-not-allowed"
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500" title="Shipping cost is calculated automatically from tracking records">
-                        <Package className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </div>
-            </div>
-          )}
-
-          {/* Invoice PDF Section */}
-          <div className="mt-4 pt-3 border-t border-slate-800 space-y-2 text-xs">
-            <span className="text-slate-400 flex items-center space-x-1.5 font-semibold">
-              <FileText className="w-4 h-4 text-indigo-400" />
-              <span>{t.invoicePdf}</span>
-            </span>
-
-            {attachedInvoices.length === 0 ? (
-              <p className="text-slate-500 italic">{t.noInvoice}</p>
+      }
+    >
+      {/* Purchase Amounts */}
+      <div className="rounded-2xl border border-line bg-panel p-4 mb-6 dark:border-line-dark dark:bg-panel">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary dark:text-ink-tertiary-dark">
+            {language === 'es' ? 'Desglose de Costos y Factura' : 'Cost Breakdown & Invoice'}
+          </span>
+          {isAdmin &&
+            (!isEditingPurchase ? (
+              <button
+                onClick={() => {
+                  setItemAmount(purchase.item_amount);
+                  setTaxAmount(purchase.tax_amount);
+                  setShippingCost(purchase.shipping_cost);
+                  setInvoiceUrl(purchase.invoice_url || '');
+                  setIsEditingPurchase(true);
+                }}
+                className="flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent-hover dark:hover:text-accent-hover-dark"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+                <span>{language === 'es' ? 'Editar montos' : 'Edit amounts'}</span>
+              </button>
             ) : (
-              <div className="space-y-1.5">
-                {attachedInvoices.map((invUrl, index) => {
-                  const cleanName = invUrl.startsWith('blob:')
-                    ? `Factura_${purchase.order_number || 'Pedido'}.pdf`
-                    : invUrl.split('/').pop() || invUrl;
-
-                  return (
-                    <div key={index} className="flex items-center justify-between bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
-                      <span className="font-mono text-slate-300 text-xs truncate max-w-[280px]" title={cleanName}>
-                        {cleanName}
-                      </span>
-                      {onOpenPreviewInvoice && (
-                        <button
-                          onClick={() => onOpenPreviewInvoice(invUrl)}
-                          className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>{language === 'es' ? 'Ver Factura' : 'View Invoice'}</span>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+              <Button size="sm" variant="success" onClick={handleSavePurchase}>
+                <Save className="h-3.5 w-3.5" />
+                <span>{t.saveChanges}</span>
+              </Button>
+            ))}
         </div>
 
-        {/* Shipping Packages Tracking Section */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-bold text-slate-300">Package Tracking Records</h4>
+        {!isEditingPurchase ? (
+          <div className="grid grid-cols-4 gap-3 border-t border-line pt-3 text-center dark:border-line-dark">
+            <div>
+              <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.itemAmount}</p>
+              <p className="font-mono tabular-nums text-sm font-bold text-ink dark:text-ink-dark">{money(purchase.item_amount)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.taxAmount}</p>
+              <p className="font-mono tabular-nums text-sm font-bold text-ink-secondary dark:text-ink-secondary-dark">{money(purchase.tax_amount)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.shippingCost}</p>
+              <p className="font-mono tabular-nums text-sm font-bold text-ink-secondary dark:text-ink-secondary-dark">{money(purchase.shipping_cost)}</p>
+            </div>
+            <div className="rounded-xl bg-accent/10 p-2">
+              <p className="text-xs font-semibold text-accent">{t.totalCost}</p>
+              <p className="font-mono tabular-nums text-base font-extrabold text-accent">{money(purchase.total_cost)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-3 pt-2">
+            <div>
+              <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.itemAmount}</label>
+              <Input type="number" step="0.01" value={itemAmount} onChange={(e) => setItemAmount(parseFloat(e.target.value) || 0)} className="w-full font-mono" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.taxAmount}</label>
+              <Input type="number" step="0.01" value={taxAmount} onChange={(e) => setTaxAmount(parseFloat(e.target.value) || 0)} className="w-full font-mono" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.shippingCost}</label>
+              <div className="relative">
+                <Input type="number" step="0.01" value={shippingCost} disabled className="w-full font-mono opacity-60" />
+                <Package className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted dark:text-ink-muted-dark" />
+              </div>
+            </div>
+          </div>
+        )}
 
-          {relatedPackages.length === 0 ? (
-            <p className="text-xs text-slate-500 italic p-4 glass-card rounded-2xl text-center">
-              No tracking records associated with this order number.
-            </p>
+        {/* Invoice PDF Section */}
+        <div className="mt-4 space-y-2 border-t border-line pt-3 text-xs dark:border-line-dark">
+          <span className="flex items-center gap-1.5 font-semibold text-ink-secondary dark:text-ink-secondary-dark">
+            <FileText className="h-4 w-4 text-accent" />
+            <span>{t.invoicePdf}</span>
+          </span>
+
+          {attachedInvoices.length === 0 ? (
+            <p className="italic text-ink-muted dark:text-ink-muted-dark">{t.noInvoice}</p>
           ) : (
-            relatedPackages.map((pkg) => {
-              const isPkgEditing = editingPkgId === pkg.id;
+            <div className="space-y-1.5">
+              {attachedInvoices.map((invUrl, index) => {
+                const cleanName = invUrl.startsWith('blob:')
+                  ? `Factura_${purchase.order_number || 'Pedido'}.pdf`
+                  : invUrl.split('/').pop() || invUrl;
 
-              return (
-                <div key={pkg.id} className="glass-card p-4 rounded-2xl text-xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-indigo-300 font-bold">{pkg.tracking_number || 'No Tracking ID'}</span>
-                    {isAdmin && (
-                      !isPkgEditing ? (
-                        <button
-                          onClick={() => handleStartEditPackage(pkg)}
-                          className="text-indigo-400 hover:text-indigo-300 flex items-center space-x-1 font-semibold"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          <span>Update Tracking</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleSavePackage(pkg.id)}
-                          className="text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 font-semibold bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20"
-                        >
-                          <Save className="w-3.5 h-3.5" />
-                          <span>Save Package</span>
-                        </button>
-                      )
+                return (
+                  <div key={index} className="flex items-center justify-between rounded-xl border border-line bg-black/[0.02] p-2.5 dark:border-line-dark dark:bg-white/[0.03]">
+                    <span className="max-w-[280px] truncate font-mono text-xs text-ink-secondary dark:text-ink-secondary-dark" title={cleanName}>
+                      {cleanName}
+                    </span>
+                    {onOpenPreviewInvoice && (
+                      <Button size="sm" variant="secondary" onClick={() => onOpenPreviewInvoice(invUrl)}>
+                        <Eye className="h-3.5 w-3.5 text-accent" />
+                        <span>{language === 'es' ? 'Ver Factura' : 'View Invoice'}</span>
+                      </Button>
                     )}
                   </div>
-
-                  {!isPkgEditing ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-slate-300">
-                      <div>
-                        <span className="text-slate-500 block">Shipping Cost:</span>
-                        <span className="font-mono font-bold">${pkg.shipping_cost.toFixed(2)}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Warehouse:</span>
-                        <span className={pkg.warehouse_received ? 'text-emerald-400 font-semibold' : 'text-slate-500'}>
-                          {pkg.warehouse_received ? '✓ Received' : 'Pending'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Personally:</span>
-                        <span className={pkg.personally_received ? 'text-emerald-400 font-semibold' : 'text-slate-500'}>
-                          {pkg.personally_received ? '✓ Received' : 'Pending'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">Dispatch Flight:</span>
-                        <span className="text-slate-200">{pkg.dispatch_date || 'N/A'}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 pt-2">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-slate-400 mb-1">Shipping Cost ($)</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={pkgShippingCost}
-                            onChange={(e) => setPkgShippingCost(parseFloat(e.target.value) || 0)}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white font-mono"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-slate-400 mb-1">Dispatch Flight Date</label>
-                          <input
-                            type="text"
-                            value={pkgDispatchDate}
-                            onChange={(e) => setPkgDispatchDate(e.target.value)}
-                            placeholder="e.g. Viernes 17"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-6">
-                        <label className="flex items-center space-x-2 text-slate-300 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={pkgWarehouse}
-                            onChange={(e) => setPkgWarehouse(e.target.checked)}
-                            className="rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500"
-                          />
-                          <span>Received in Warehouse</span>
-                        </label>
-
-                        <label className="flex items-center space-x-2 text-slate-300 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={pkgPersonally}
-                            onChange={(e) => setPkgPersonally(e.target.checked)}
-                            className="rounded bg-slate-900 border-slate-700 text-emerald-600 focus:ring-emerald-500"
-                          />
-                          <span>Received Personally</span>
-                        </label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-          
-          {/* Add Tracking Section */}
-          {isAdmin && (
-            <div className="mt-4 border-t border-slate-800/80 pt-4">
-              {!isAddingTracking ? (
-                <button
-                  onClick={() => setIsAddingTracking(true)}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 rounded-xl transition"
-                >
-                  {t.addTracking || '+ Add Tracking Number'}
-                </button>
-              ) : (
-                <div className="flex items-center space-x-2 flex-wrap sm:flex-nowrap gap-y-2">
-                  <input
-                    type="text"
-                    value={newTrackingNumber}
-                    onChange={(e) => setNewTrackingNumber(e.target.value)}
-                    placeholder={t.enterTracking || 'Enter tracking number (e.g. TBA...)'}
-                    className="flex-1 min-w-[150px] bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white"
-                  />
-                  <div className="flex items-center space-x-2">
-                    <span className="text-slate-400 text-xs">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={newPkgShippingCost}
-                      onChange={(e) => setNewPkgShippingCost(parseFloat(e.target.value) || 0)}
-                      placeholder="0.00"
-                      className="w-20 bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white font-mono"
-                    />
-                  </div>
-                  <button
-                    onClick={handleAddTracking}
-                    disabled={isSubmittingTracking || !newTrackingNumber.trim()}
-                    className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-semibold px-4 py-2 rounded-xl transition flex items-center"
-                  >
-                    {isSubmittingTracking ? '...' : (t.save || 'Save')}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsAddingTracking(false);
-                      setNewTrackingNumber('');
-                    }}
-                    disabled={isSubmittingTracking}
-                    className="text-slate-400 hover:text-white p-2"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          {/* Admin Actions: Reassign & Delete */}
-          {isAdmin && (
-            <div className="mt-6 pt-4 border-t border-slate-800/80 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">{t.adminCorrections}</h4>
-
-              {actionError && (
-                <p className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-xl p-2.5">
-                  {actionError}
-                </p>
-              )}
-
-              {!isReassigning ? (
-                <button
-                  onClick={() => setIsReassigning(true)}
-                  className="flex items-center space-x-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 rounded-xl transition"
-                >
-                  <UserCog className="w-3.5 h-3.5" />
-                  <span>{t.reassign}</span>
-                </button>
-              ) : (
-                <div className="glass-card p-4 rounded-2xl space-y-3">
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1">{t.reassignAction}</label>
-                    <select
-                      value={reassignTargetId}
-                      onChange={(e) => setReassignTargetId(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white"
-                    >
-                      <option value="">{t.selectPersonPlaceholder}</option>
-                      {reassignCandidates.map((person) => (
-                        <option key={person.id} value={person.id}>{person.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {hasRecordedPayments && (
-                    <p className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5">
-                      {t.paymentsStayWarning}
-                    </p>
-                  )}
-
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={handleReassign}
-                      disabled={isSubmittingReassign || !reassignTargetId}
-                      className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-semibold px-4 py-2 rounded-xl transition"
-                    >
-                      {isSubmittingReassign ? t.reassigning : t.reassignAction}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsReassigning(false);
-                        setReassignTargetId('');
-                      }}
-                      disabled={isSubmittingReassign}
-                      className="text-xs text-slate-400 hover:text-white p-2"
-                    >
-                      {t.cancel}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {!showDeleteConfirm ? (
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="flex items-center space-x-1.5 text-xs text-rose-400 hover:text-rose-300 font-semibold border border-rose-500/30 bg-rose-500/10 px-4 py-2 rounded-xl transition"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>{t.deleteOrder}</span>
-                </button>
-              ) : (
-                <div className="glass-card p-4 rounded-2xl border-rose-500/30 space-y-3">
-                  <p className="text-xs font-bold text-rose-300">{t.deleteOrderConfirmTitle}</p>
-                  <p className="text-xs text-slate-400">{t.deleteOrderConfirmBody}</p>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={handleDelete}
-                      disabled={isSubmittingDelete}
-                      className="text-xs bg-rose-600 hover:bg-rose-500 disabled:bg-slate-700 disabled:text-slate-400 text-white font-semibold px-4 py-2 rounded-xl transition"
-                    >
-                      {isSubmittingDelete ? t.deleting : t.confirmDelete}
-                    </button>
-                    <button
-                      onClick={() => setShowDeleteConfirm(false)}
-                      disabled={isSubmittingDelete}
-                      className="text-xs text-slate-400 hover:text-white p-2"
-                    >
-                      {t.cancel}
-                    </button>
-                  </div>
-                </div>
-              )}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
-    </div>
+
+      {/* Shipping Packages Tracking */}
+      <div className="mb-6 space-y-3">
+        <h4 className="text-sm font-bold text-ink dark:text-ink-dark">
+          {language === 'es' ? 'Registros de Envío' : 'Package Tracking Records'}
+        </h4>
+
+        {relatedPackages.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line p-4 text-center text-xs italic text-ink-muted dark:border-line-dark dark:text-ink-muted-dark">
+            {language === 'es' ? 'Sin registros de tracking para esta orden.' : 'No tracking records associated with this order number.'}
+          </p>
+        ) : (
+          relatedPackages.map((pkg) => {
+            const isPkgEditing = editingPkgId === pkg.id;
+
+            return (
+              <div key={pkg.id} className="rounded-2xl border border-line bg-panel p-4 text-xs dark:border-line-dark dark:bg-panel">
+                <div className="flex items-center justify-between">
+                  <Badge tone="accent" className="font-mono">
+                    {pkg.tracking_number || 'No Tracking ID'}
+                  </Badge>
+                  {isAdmin &&
+                    (!isPkgEditing ? (
+                      <button
+                        onClick={() => handleStartEditPackage(pkg)}
+                        className="flex items-center gap-1 font-semibold text-accent hover:text-accent-hover dark:hover:text-accent-hover-dark"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                        <span>{language === 'es' ? 'Actualizar' : 'Update'}</span>
+                      </button>
+                    ) : (
+                      <Button size="sm" variant="success" onClick={() => handleSavePackage(pkg.id)}>
+                        <Save className="h-3.5 w-3.5" />
+                        <span>{t.saveChanges}</span>
+                      </Button>
+                    ))}
+                </div>
+
+                {!isPkgEditing ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-ink-secondary sm:grid-cols-4 dark:text-ink-secondary-dark">
+                    <div>
+                      <span className="block text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Costo Envío' : 'Shipping Cost'}:</span>
+                      <span className="font-mono tabular-nums font-bold text-ink dark:text-ink-dark">{money(pkg.shipping_cost)}</span>
+                    </div>
+                    <div>
+                      <span className="block text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Almacén' : 'Warehouse'}:</span>
+                      <span className={pkg.warehouse_received ? 'font-semibold text-success' : 'text-ink-muted dark:text-ink-muted-dark'}>
+                        {pkg.warehouse_received ? (language === 'es' ? '✓ Recibido' : '✓ Received') : (language === 'es' ? 'Pendiente' : 'Pending')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Personal' : 'Personally'}:</span>
+                      <span className={pkg.personally_received ? 'font-semibold text-success' : 'text-ink-muted dark:text-ink-muted-dark'}>
+                        {pkg.personally_received ? (language === 'es' ? '✓ Recibido' : '✓ Received') : (language === 'es' ? 'Pendiente' : 'Pending')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Vuelo Salida' : 'Dispatch Flight'}:</span>
+                      <span className="text-ink dark:text-ink-dark">{pkg.dispatch_date || 'N/A'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Costo Envío ($)' : 'Shipping Cost ($)'}</label>
+                        <Input type="number" step="0.01" value={pkgShippingCost} onChange={(e) => setPkgShippingCost(parseFloat(e.target.value) || 0)} className="w-full font-mono" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Fecha Vuelo Salida' : 'Dispatch Flight Date'}</label>
+                        <Input type="text" value={pkgDispatchDate} onChange={(e) => setPkgDispatchDate(e.target.value)} placeholder="e.g. Viernes 17" className="w-full" />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                      <label className="flex cursor-pointer items-center gap-2 text-ink-secondary dark:text-ink-secondary-dark">
+                        <input type="checkbox" checked={pkgWarehouse} onChange={(e) => setPkgWarehouse(e.target.checked)} className="accent-accent rounded" />
+                        <span>{t.warehouseReceived}</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-ink-secondary dark:text-ink-secondary-dark">
+                        <input type="checkbox" checked={pkgPersonally} onChange={(e) => setPkgPersonally(e.target.checked)} className="accent-success rounded" />
+                        <span>{t.personallyReceived}</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+
+        {/* Add Tracking */}
+        {isAdmin && (
+          <div className="border-t border-line pt-4 dark:border-line-dark">
+            {!isAddingTracking ? (
+              <Button size="sm" variant="secondary" onClick={() => setIsAddingTracking(true)}>
+                <Plus className="h-3.5 w-3.5 text-accent" />
+                <span>{t.addTracking}</span>
+              </Button>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="text"
+                  value={newTrackingNumber}
+                  onChange={(e) => setNewTrackingNumber(e.target.value)}
+                  placeholder={t.enterTracking}
+                  className="min-w-[150px] flex-1 font-mono"
+                />
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-ink-muted dark:text-ink-muted-dark">$</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newPkgShippingCost}
+                    onChange={(e) => setNewPkgShippingCost(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-20 font-mono"
+                  />
+                </div>
+                <Button size="sm" onClick={handleAddTracking} disabled={isSubmittingTracking || !newTrackingNumber.trim()}>
+                  {isSubmittingTracking ? t.saving : t.save}
+                </Button>
+                <button
+                  onClick={() => {
+                    setIsAddingTracking(false);
+                    setNewTrackingNumber('');
+                  }}
+                  disabled={isSubmittingTracking}
+                  className="p-2 text-ink-muted hover:text-ink dark:text-ink-muted-dark dark:hover:text-ink-dark"
+                >
+                  <span className="h-4 w-4">✕</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Admin: Reassign & Delete */}
+        {isAdmin && (
+          <div className="mt-6 space-y-3 border-t border-line pt-4 dark:border-line-dark">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary dark:text-ink-tertiary-dark">{t.adminCorrections}</h4>
+
+            {actionError && (
+              <p className="rounded-xl border border-danger/30 bg-danger/10 p-2.5 text-xs text-danger">{actionError}</p>
+            )}
+
+            {!isReassigning ? (
+              <Button size="sm" variant="secondary" onClick={() => setIsReassigning(true)}>
+                <UserCog className="h-3.5 w-3.5 text-accent" />
+                <span>{t.reassign}</span>
+              </Button>
+            ) : (
+              <div className="rounded-2xl border border-line bg-panel p-4 space-y-3 dark:border-line-dark dark:bg-panel">
+                <div>
+                  <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.reassignAction}</label>
+                  <select
+                    value={reassignTargetId}
+                    onChange={(e) => setReassignTargetId(e.target.value)}
+                    className="w-full rounded-[8px] border border-line bg-panel px-3 py-2 text-xs text-ink outline-none focus:ring-2 focus:ring-accent/40 dark:border-line-dark dark:bg-panel-dark dark:text-ink-dark"
+                  >
+                    <option value="">{t.selectPersonPlaceholder}</option>
+                    {reassignCandidates.map((person) => (
+                      <option key={person.id} value={person.id}>{person.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {hasRecordedPayments && (
+                  <p className="rounded-xl border border-warning/30 bg-warning/10 p-2.5 text-xs text-warning">{t.paymentsStayWarning}</p>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={handleReassign} disabled={isSubmittingReassign || !reassignTargetId}>
+                    {isSubmittingReassign ? t.reassigning : t.reassignAction}
+                  </Button>
+                  <button
+                    onClick={() => {
+                      setIsReassigning(false);
+                      setReassignTargetId('');
+                    }}
+                    disabled={isSubmittingReassign}
+                    className="p-2 text-xs text-ink-muted hover:text-ink dark:text-ink-muted-dark dark:hover:text-ink-dark"
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!showDeleteConfirm ? (
+              <Button size="sm" variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>{t.deleteOrder}</span>
+              </Button>
+            ) : (
+              <div className="space-y-3 rounded-2xl border border-danger/30 bg-panel p-4 dark:bg-panel-dark">
+                <p className="text-xs font-bold text-danger">{t.deleteOrderConfirmTitle}</p>
+                <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.deleteOrderConfirmBody}</p>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="danger" onClick={handleDelete} disabled={isSubmittingDelete}>
+                    {isSubmittingDelete ? t.deleting : t.confirmDelete}
+                  </Button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={isSubmittingDelete}
+                    className="p-2 text-xs text-ink-muted hover:text-ink dark:text-ink-muted-dark dark:hover:text-ink-dark"
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 };

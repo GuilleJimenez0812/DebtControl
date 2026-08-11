@@ -4,9 +4,12 @@ import '@fontsource-variable/inter'
 import '@fontsource-variable/jetbrains-mono'
 import './index.css'
 import App from './App.tsx'
+import { ToastProvider } from './components/ui/Toast.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </StrictMode>,
 )
