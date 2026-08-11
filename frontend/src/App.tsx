@@ -367,6 +367,7 @@ const DashboardContent: React.FC = () => {
 
       <AuthModal
         isOpen={isAuthOpen}
+        language={language}
         onClose={() => setIsAuthOpen(false)}
         onLogin={handleLogin}
         onRegister={handleRegister}

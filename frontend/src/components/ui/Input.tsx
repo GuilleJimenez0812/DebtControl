@@ -4,9 +4,10 @@ import { twMerge } from 'tailwind-merge';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
 
-export const Input: React.FC<InputProps> = ({ className, ...props }) => {
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, ...props }, ref) => {
   return (
     <input
+      ref={ref}
       className={twMerge(
         clsx(
           'w-full h-9 rounded-[8px] border bg-transparent px-3 text-sm transition',
@@ -19,4 +20,6 @@ export const Input: React.FC<InputProps> = ({ className, ...props }) => {
       {...props}
     />
   );
-};
+});
+
+Input.displayName = 'Input';
