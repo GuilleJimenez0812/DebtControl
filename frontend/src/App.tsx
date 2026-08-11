@@ -37,7 +37,15 @@ const DashboardContent: React.FC = () => {
     const savedLang = localStorage.getItem('debtcontrol_lang');
     return (savedLang === 'en' || savedLang === 'es') ? savedLang : 'es';
   });
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('debtcontrol_dark');
+    return saved === null ? false : saved === 'true';
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+    localStorage.setItem('debtcontrol_dark', String(isDarkMode));
+  }, [isDarkMode]);
 
   const handleLanguageChange = (newLang: Language) => {
     setLanguage(newLang);
