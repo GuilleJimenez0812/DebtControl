@@ -28,8 +28,10 @@
   --color-ink: #1d1d1f;
   --color-ink-secondary: #484950;
   --color-ink-muted: #86868b;
+  --color-ink-tertiary: #a1a1a6;
   --color-line: rgba(0, 0, 0, 0.1);
   --color-line-strong: rgba(0, 0, 0, 0.16);
+  --color-accent-hover: #0077ed;
 
   /* Dark palette — ADR-0009 Q1 */
   --color-canvas-dark: #1d1d1f;
@@ -44,14 +46,18 @@
   --color-ink-dark: #f5f5f7;
   --color-ink-secondary-dark: #a1a1a6;
   --color-ink-muted-dark: #6e6e73;
+  --color-ink-tertiary-dark: #484950;
   --color-line-dark: rgba(255, 255, 255, 0.1);
   --color-line-strong-dark: rgba(255, 255, 255, 0.16);
+  --color-accent-hover-dark: #409cff;
 
   /* macOS radii & elevation — ADR-0009 */
   --radius-panel: 12px;
   --radius-control: 8px;
   --shadow-panel: 0 2px 12px rgba(0, 0, 0, 0.08);
   --shadow-panel-dark: 0 2px 12px rgba(0, 0, 0, 0.4);
+  --shadow-apple: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-apple-dark: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
 @layer base {
