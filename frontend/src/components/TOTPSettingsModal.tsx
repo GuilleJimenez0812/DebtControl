@@ -24,25 +24,25 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, la
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
 
-  const loadStatus = async () => {
-    try {
-      const status = await apiService.getTOTPStatus();
-      setEnabled(status.totp_enabled);
-      setSetupStep('idle');
-      setSecret('');
-      setProvisioningUri('');
-      setCode('');
-      setError('');
-      setMessage('');
-    } catch {
-      setError(language === 'es' ? 'No se pudieron cargar los ajustes de seguridad.' : 'Failed to load security settings.');
-    }
-  };
-
   useEffect(() => {
     if (isOpen) {
+      const loadStatus = async () => {
+        try {
+          const status = await apiService.getTOTPStatus();
+          setEnabled(status.totp_enabled);
+          setSetupStep('idle');
+          setSecret('');
+          setProvisioningUri('');
+          setCode('');
+          setError('');
+          setMessage('');
+        } catch {
+          setError(language === 'es' ? 'No se pudieron cargar los ajustes de seguridad.' : 'Failed to load security settings.');
+        }
+      };
       loadStatus();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const handleBeginSetup = async (e: React.FormEvent) => {

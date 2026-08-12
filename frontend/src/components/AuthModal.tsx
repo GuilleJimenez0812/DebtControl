@@ -75,10 +75,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const nameFieldError = isRegisterMode && fullName.trim() === '' ? t.nameRequired : '';
   const totpFieldError = totpCode.length > 0 && totpCode.length !== 6 ? t.invalidCode : '';
   const hasFieldErrors =
-    email !== '' && !emailValid(email) ||
+    (email !== '' && !emailValid(email)) ||
     (password !== '' && password.length < 8) ||
     (isRegisterMode && fullName.trim() === '') ||
-    (mfaTicket && totpCode.length !== 6);
+    (mfaTicket.length > 0 && totpCode.length !== 6);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

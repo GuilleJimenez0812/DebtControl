@@ -46,9 +46,9 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
                 {t.outstandingBalance}
               </p>
             </div>
-            <h2 className="mt-3 text-4xl sm:text-5xl font-bold text-ink dark:text-ink-dark font-mono tabular-nums tracking-tight">
+            <h1 className="mt-3 text-4xl sm:text-5xl font-bold text-ink dark:text-ink-dark font-mono tabular-nums tracking-tight">
               {money(totalOutstanding)}
-            </h2>
+            </h1>
           </div>
 
           {/* Minimalist Payment Completion */}

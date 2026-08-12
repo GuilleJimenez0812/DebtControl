@@ -65,7 +65,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="mac-vibrancy mac-vibrancy-light dark:mac-vibrancy sticky top-0 z-40 border-b border-line dark:border-line-dark">
+    <header className="mac-vibrancy mac-vibrancy-light dark:mac-vibrancy sticky top-0 z-40 border-b border-line dark:border-line-dark">
       <div className="flex h-11 items-center justify-between gap-3 px-4">
         <div className="flex items-center gap-3 min-w-0">
           <TrafficLights />
@@ -171,6 +171,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </header>
   );
 };
