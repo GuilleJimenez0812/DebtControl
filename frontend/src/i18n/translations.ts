@@ -217,6 +217,8 @@ export const translations = {
     creatingOrder: 'Creating...',
     invoiceAttached: 'Invoice attached successfully.',
     invoiceCreated: 'Purchase order created successfully.',
+    verifyingCode: 'Verifying code...',
+    signingIn: 'Signing in...',
   },
   es: {
     appTitle: 'DebtControl | Gestión de Deudas',
@@ -434,5 +436,7 @@ export const translations = {
     creatingOrder: 'Creando...',
     invoiceAttached: 'Factura adjuntada correctamente.',
     invoiceCreated: 'Orden de compra creada correctamente.',
+    verifyingCode: 'Verificando código...',
+    signingIn: 'Iniciando sesión...',
   },
 };

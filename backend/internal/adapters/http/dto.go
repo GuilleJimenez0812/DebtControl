@@ -54,6 +54,7 @@ type UpdatePurchaseRequest struct {
 	TaxAmount    float64 `json:"tax_amount" binding:"gte=0"`
 	ShippingCost float64 `json:"shipping_cost" binding:"gte=0"`
 	InvoiceURL   string  `json:"invoice_url"`
+	DetailPeriod string  `json:"detail_period"`
 }
 
 type CreatePackageRequest struct {

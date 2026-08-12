@@ -287,7 +287,7 @@ func (service *AuthService) CompleteLoginWithTOTP(ctx context.Context, ticket st
 }
 
 func (service *AuthService) issueSession(ctx context.Context, result *ports.LoginResult, user *domain.User) error {
-	accessToken, tokenID, err := security.GenerateAccessToken(user.ID, user.Email, string(user.Role), service.jwtSecret, 15*time.Minute)
+	accessToken, tokenID, err := security.GenerateAccessToken(user.ID, user.Email, string(user.Role), service.jwtSecret, 30*24*time.Hour)
 	if err != nil {
 		return err
 	}
@@ -321,7 +321,7 @@ func (service *AuthService) Refresh(ctx context.Context, presentedRefreshToken s
 		return "", "", nil, ErrInvalidCredentials
 	}
 
-	accessToken, _, err = security.GenerateAccessToken(resolvedUser.ID, resolvedUser.Email, string(resolvedUser.Role), service.jwtSecret, 15*time.Minute)
+	accessToken, _, err = security.GenerateAccessToken(resolvedUser.ID, resolvedUser.Email, string(resolvedUser.Role), service.jwtSecret, 30*24*time.Hour)
 	if err != nil {
 		return "", "", nil, err
 	}

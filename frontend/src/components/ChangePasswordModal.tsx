@@ -139,7 +139,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen
             </Button>
             <Button
               type="submit"
-              disabled={loading || newPassword.length < 12 || newPassword !== confirmPassword || !currentPassword}
+              isLoading={loading} disabled={loading || newPassword.length < 12 || newPassword !== confirmPassword || !currentPassword}
               className="flex-1"
             >
               {loading ? t.saving : t.changePasswordBtn}

@@ -197,8 +197,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                   className="mt-4"
                 >
-                  <Button type="submit" disabled={loading || totpCode.length !== 6} className="w-full">
-                    {loading ? t.processing : t.verifyAndSignIn}
+                  <Button type="submit" isLoading={loading} disabled={loading || totpCode.length !== 6} className="w-full">
+                    {loading ? t.verifyingCode : t.verifyCode}
                   </Button>
                 </motion.div>
                 <button
@@ -292,8 +292,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   whileTap={reduceMotion ? undefined : { scale: 0.99 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 >
-                  <Button type="submit" disabled={loading || hasFieldErrors} className="w-full">
-                    {loading ? t.processing : isRegisterMode ? t.registerAccount : t.signIn}
+                  <Button type="submit" isLoading={loading} disabled={loading || hasFieldErrors} className="w-full">
+                    {loading ? (isRegisterMode ? t.creatingAccount : t.signingIn) : isRegisterMode ? t.createAccount : t.signIn}
                   </Button>
                 </motion.div>
               </>

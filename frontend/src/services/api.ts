@@ -17,12 +17,39 @@ function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-// Echo the non-HttpOnly double-submit CSRF cookie on every mutation.
+// A simple synchronous hash function to generate consistent keys for identical requests
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+// Echo the non-HttpOnly double-submit CSRF cookie on every mutation,
+// and inject an idempotency key for non-GET requests to prevent double-clicks.
 apiClient.interceptors.request.use((config) => {
   const csrf = readCookie('csrf_token');
   if (csrf) {
     config.headers['X-CSRF-Token'] = csrf;
   }
+
+  const method = config.method?.toUpperCase();
+  if (method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    let dataStr = '';
+    if (config.data) {
+      if (config.data instanceof FormData) {
+        // We skip hashing FormData perfectly, just use URL for idempotency (good enough for double-clicks)
+        dataStr = 'FormData';
+      } else {
+        try { dataStr = JSON.stringify(config.data); } catch { /* ignore */ }
+      }
+    }
+    const keyData = `${method}:${config.url}:${dataStr}`;
+    config.headers['X-Idempotency-Key'] = simpleHash(keyData);
+  }
+
   return config;
 });
 
@@ -196,7 +223,7 @@ export const apiService = {
 
   updatePurchase: async (
     id: string,
-    payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string }
+    payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string }
   ): Promise<{ purchase: PurchaseItem }> => {
     const response = await apiClient.put<{ purchase: PurchaseItem }>(`/debts/purchases/${id}`, payload);
     return response.data;

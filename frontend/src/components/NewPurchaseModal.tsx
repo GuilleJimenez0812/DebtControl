@@ -356,7 +356,7 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
           </div>
 
           <div className="pt-2">
-            <Button type="submit" disabled={loading || parsingPDF} className="w-full">
+            <Button type="submit" isLoading={loading} disabled={loading || parsingPDF} className="w-full">
               {loading ? t.saving : t.savePurchase}
             </Button>
           </div>

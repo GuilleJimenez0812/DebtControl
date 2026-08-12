@@ -212,7 +212,7 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
                 <Button size="sm" variant="ghost" onClick={() => setSelectedUser(null)}>
                   {t.cancel}
                 </Button>
-                <Button size="sm" onClick={handleSaveAssignments} disabled={loading}>
+                <Button size="sm" onClick={handleSaveAssignments} isLoading={loading} disabled={loading}>
                   <Save className="h-3.5 w-3.5" />
                   <span>{loading ? t.saving : t.savePermissions}</span>
                 </Button>
@@ -252,7 +252,7 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
             />
           </div>
 
-          <Button type="submit" disabled={loading} className="w-full">
+          <Button type="submit" isLoading={loading} disabled={loading} className="w-full">
             <UserPlus className="h-4 w-4" />
             <span>{loading ? t.creatingAccount : t.createAccount}</span>
           </Button>

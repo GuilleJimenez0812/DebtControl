@@ -236,7 +236,7 @@ func (service *DebtService) CreatePurchaseItem(ctx context.Context, personName s
 	return newItem, nil
 }
 
-func (service *DebtService) UpdatePurchaseItem(ctx context.Context, id string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string) (*domain.PurchaseItem, error) {
+func (service *DebtService) UpdatePurchaseItem(ctx context.Context, id string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string, detailPeriod string) (*domain.PurchaseItem, error) {
 	item, err := service.debtRepo.FindPurchaseByID(ctx, id)
 	if err != nil || item == nil {
 		return nil, domain.ErrPurchaseItemNotFound
@@ -245,6 +245,7 @@ func (service *DebtService) UpdatePurchaseItem(ctx context.Context, id string, i
 	item.ItemAmount = itemAmount
 	item.TaxAmount = taxAmount
 	item.ShippingCost = shippingCost
+	item.DetailPeriod = detailPeriod
 	if invoiceURL != "" {
 		item.InvoiceURL = invoiceURL
 	}

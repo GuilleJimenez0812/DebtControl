@@ -1,6 +1,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Loader2 } from 'lucide-react';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 type Size = 'sm' | 'md' | 'lg';
@@ -8,6 +9,7 @@ type Size = 'sm' | 'md' | 'lg';
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
+  isLoading?: boolean;
 }
 
 const base =
@@ -28,6 +30,15 @@ const sizes: Record<Size, string> = {
   lg: 'h-11 px-5 text-sm',
 };
 
-export const Button: React.FC<ButtonProps> = ({ className, variant = 'primary', size = 'md', ...props }) => {
-  return <button className={twMerge(clsx(base, variants[variant], sizes[size], className))} {...props} />;
+export const Button: React.FC<ButtonProps> = ({ className, variant = 'primary', size = 'md', isLoading, disabled, children, ...props }) => {
+  return (
+    <button 
+      className={twMerge(clsx(base, variants[variant], sizes[size], className))} 
+      disabled={disabled || isLoading}
+      {...props}
+    >
+      {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+      {children}
+    </button>
+  );
 };
