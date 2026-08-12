@@ -1,13 +1,14 @@
 import React from 'react';
-import type { PurchaseItem } from '../types';
+import type { PurchaseItem, ShippingPackage } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { ShoppingBag, Tag, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Tag, ArrowRight, FileText, Truck } from 'lucide-react';
 import { Select, type SelectOption } from './ui/Select';
 import { Badge } from './ui/Badge';
 
 interface PurchasesListProps {
   purchases: PurchaseItem[];
+  packages: ShippingPackage[];
   language: Language;
   selectedPersonFilter: string;
   onPersonFilterChange: (person: string) => void;
@@ -20,6 +21,7 @@ const money = (n: number) => `$${n.toFixed(2)}`;
 
 export const PurchasesList: React.FC<PurchasesListProps> = ({
   purchases,
+  packages,
   language,
   selectedPersonFilter,
   onPersonFilterChange,
@@ -83,6 +85,7 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                 <tr className="border-b border-line text-xs font-semibold text-ink-tertiary uppercase tracking-wider dark:border-line-dark dark:text-ink-tertiary-dark">
                   <th className="py-3 px-2">{t.person}</th>
                   <th className="py-3 px-2">{language === 'es' ? 'Orden / Artículo' : 'Order / Item'}</th>
+                  <th className="py-3 px-2">{language === 'es' ? 'Alertas' : 'Alerts'}</th>
                   <th className="py-3 px-2">{t.itemAmount}</th>
                   <th className="py-3 px-2">{t.taxAmount}</th>
                   <th className="py-3 px-2">{t.shippingCost}</th>
@@ -92,20 +95,39 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-line text-sm dark:divide-line-dark">
-                {filteredPurchases.map((item) => (
+                {filteredPurchases.map((item) => {
+                  const hasInvoice = !!item.invoice_url;
+                  const hasTracking = packages.some(pkg => pkg.purchase_item_id === item.id && pkg.tracking_number);
+                  return (
                   <tr
                     key={item.id}
                     onClick={() => onSelectPurchase(item)}
                     className="hover:bg-black/[0.03] transition cursor-pointer group dark:hover:bg-white/[0.04]"
                   >
-                    <td className="py-3.5 px-2 font-semibold text-ink dark:text-ink-dark">{item.person_name}</td>
+                    <td className="py-3.5 px-2 font-medium text-ink dark:text-ink-dark">{item.person_name}</td>
                     <td className="py-3.5 px-2">
-                      <div className="font-mono font-bold text-ink group-hover:text-accent transition dark:text-ink-dark">
-                        {item.order_number || item.description}
+                      <div className="flex flex-col">
+                        <span className="font-mono text-xs text-ink-secondary dark:text-ink-secondary-dark">{item.order_number || item.description}</span>
+                        {item.description && item.description !== item.order_number && (
+                          <span className="text-sm text-ink font-semibold dark:text-ink-dark truncate max-w-[200px]" title={item.description}>
+                            {item.description}
+                          </span>
+                        )}
                       </div>
-                      {item.description && item.description !== item.order_number && (
-                        <div className="text-xs text-ink-tertiary mt-0.5 dark:text-ink-tertiary-dark">{item.description}</div>
-                      )}
+                    </td>
+                    <td className="py-3.5 px-2">
+                      <div className="flex items-center gap-1.5">
+                        {!hasInvoice && (
+                          <div title={language === 'es' ? 'Factura no cargada' : 'Missing Invoice'} className="text-warning dark:text-warning-dark">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                        )}
+                        {!hasTracking && (
+                          <div title={language === 'es' ? 'Tracking no cargado' : 'Missing Tracking'} className="text-error dark:text-error-dark">
+                            <Truck className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3.5 px-2 font-mono tabular-nums text-ink-secondary dark:text-ink-secondary-dark">{money(item.item_amount)}</td>
                     <td className="py-3.5 px-2 font-mono tabular-nums text-ink-tertiary dark:text-ink-tertiary-dark">-{money(item.tax_amount)}</td>
@@ -123,14 +145,17 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                       </span>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
 
           {/* Mobile: cards (≤md, ADR-0002) */}
           <div className="md:hidden grid grid-cols-1 gap-3">
-            {filteredPurchases.map((item) => (
+            {filteredPurchases.map((item) => {
+              const hasInvoice = !!item.invoice_url;
+              const hasTracking = packages.some(pkg => pkg.purchase_item_id === item.id && pkg.tracking_number);
+              return (
               <div
                 key={item.id}
                 onClick={() => onSelectPurchase(item)}
@@ -140,9 +165,19 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                   <span className="font-mono text-sm font-bold text-ink dark:text-ink-dark truncate">
                     {item.order_number || item.description}
                   </span>
-                  <span className="shrink-0 rounded-[6px] bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">
-                    {item.person_name}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      {!hasInvoice && (
+                        <FileText className="w-4 h-4 text-warning dark:text-warning-dark" />
+                      )}
+                      {!hasTracking && (
+                        <Truck className="w-4 h-4 text-error dark:text-error-dark" />
+                      )}
+                    </div>
+                    <span className="shrink-0 rounded-[6px] bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">
+                      {item.person_name}
+                    </span>
+                  </div>
                 </div>
                 {item.description && item.description !== item.order_number && (
                   <p className="text-xs text-ink-tertiary mb-2 dark:text-ink-tertiary-dark">{item.description}</p>
@@ -173,7 +208,8 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                   <span className="text-[11px] font-semibold text-accent">{language === 'es' ? 'Ver detalle' : 'View details'}</span>
                 </div>
               </div>
-            ))}
+            );
+          })}
           </div>
         </>
       )}

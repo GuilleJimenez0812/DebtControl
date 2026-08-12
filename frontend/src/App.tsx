@@ -337,6 +337,7 @@ const DashboardContent: React.FC = () => {
                     <>
                       <PurchasesList
                         purchases={summary?.recent_purchases || []}
+                        packages={summary?.shipping_packages || []}
                         language={language}
                         selectedPersonFilter={selectedPersonFilter}
                         onPersonFilterChange={setSelectedPersonFilter}
