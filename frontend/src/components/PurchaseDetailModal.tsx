@@ -270,14 +270,14 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
               <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Periodo' : 'Period'}</p>
               <p className="font-mono tabular-nums text-sm font-bold text-ink dark:text-ink-dark">{purchase.detail_period || '-'}</p>
             </div>
-            <div>
-              <p className="flex justify-center items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark" title={language === 'es' ? 'Valor total pagado de la orden' : 'Total value paid for the order'}>
+            <div title={language === 'es' ? 'Valor total pagado de la orden' : 'Total value paid for the order'}>
+              <p className="flex justify-center items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">
                 {t.itemAmount} <HelpCircle className="h-3 w-3" />
               </p>
               <p className="font-mono tabular-nums text-sm font-bold text-ink dark:text-ink-dark">{money(purchase.item_amount)}</p>
             </div>
-            <div>
-              <p className="flex justify-center items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark" title={language === 'es' ? 'El impuesto se resta ya que se solicita después el reembolso' : 'Tax is subtracted as refund is requested later'}>
+            <div title={language === 'es' ? 'El impuesto se resta ya que se solicita después el reembolso' : 'Tax is subtracted as refund is requested later'}>
+              <p className="flex justify-center items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">
                 {t.taxAmount} <HelpCircle className="h-3 w-3" />
               </p>
               <p className="font-mono tabular-nums text-sm font-bold text-ink-secondary dark:text-ink-secondary-dark">-{money(purchase.tax_amount)}</p>
@@ -307,14 +307,14 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                 className="w-full font-mono"
               />
             </div>
-            <div>
-              <label className="mb-1 flex items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark" title={language === 'es' ? 'Valor total pagado de la orden' : 'Total value paid for the order'}>
+            <div title={language === 'es' ? 'Valor total pagado de la orden' : 'Total value paid for the order'}>
+              <label className="mb-1 flex items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">
                 {t.itemAmount} <HelpCircle className="h-3 w-3" />
               </label>
               <Input type="text" inputMode="decimal" value={itemAmount} onChange={(e) => setItemAmount(e.target.value)} className="w-full font-mono" />
             </div>
-            <div>
-              <label className="mb-1 flex items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark" title={language === 'es' ? 'El impuesto se resta ya que se solicita después el reembolso' : 'Tax is subtracted as refund is requested later'}>
+            <div title={language === 'es' ? 'El impuesto se resta ya que se solicita después el reembolso' : 'Tax is subtracted as refund is requested later'}>
+              <label className="mb-1 flex items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">
                 {t.taxAmount} <HelpCircle className="h-3 w-3" />
               </label>
               <Input type="text" inputMode="decimal" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} className="w-full font-mono" />

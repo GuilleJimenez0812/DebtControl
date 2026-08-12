@@ -111,13 +111,13 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                   <th className="py-3 px-2">{language === 'es' ? 'Alertas' : 'Alerts'}</th>
                   <th className="py-3 px-2">{language === 'es' ? 'Almacén' : 'Warehouse'}</th>
                   <th className="py-3 px-2">{language === 'es' ? 'Personal' : 'Personal'}</th>
-                  <th className="py-3 px-2">
-                    <div className="flex items-center gap-1" title={language === 'es' ? 'Valor total pagado de la orden' : 'Total value paid for the order'}>
+                  <th className="py-3 px-2" title={language === 'es' ? 'Valor total pagado de la orden' : 'Total value paid for the order'}>
+                    <div className="flex items-center gap-1">
                       {t.itemAmount} <HelpCircle className="h-3 w-3" />
                     </div>
                   </th>
-                  <th className="py-3 px-2">
-                    <div className="flex items-center gap-1" title={language === 'es' ? 'El impuesto se resta ya que se solicita después el reembolso' : 'Tax is subtracted as refund is requested later'}>
+                  <th className="py-3 px-2" title={language === 'es' ? 'El impuesto se resta ya que se solicita después el reembolso' : 'Tax is subtracted as refund is requested later'}>
+                    <div className="flex items-center gap-1">
                       {t.taxAmount} <HelpCircle className="h-3 w-3" />
                     </div>
                   </th>
