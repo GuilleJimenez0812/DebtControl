@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { PurchaseItem, ShippingPackage, Person } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { FileText, Edit2, Save, Package, Eye, UserCog, Trash2, Plus } from 'lucide-react';
+import { FileText, Edit2, Save, Package, Eye, UserCog, Trash2, Plus, HelpCircle, Upload } from 'lucide-react';
 import { generateMonthPeriodOptions } from './NewPurchaseModal';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
@@ -19,7 +19,9 @@ interface PurchaseDetailModalProps {
   userRole?: string;
   onClose: () => void;
   onOpenPreviewInvoice?: (url: string) => void;
-  onUpdatePurchase: (id: string, payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string }) => Promise<void>;
+  onUploadInvoice?: (file: File) => Promise<any>;
+  onConfirmAttachInvoice?: (purchaseId: string, invoiceFilename: string, mode: 'replace' | 'append') => Promise<void>;
+  onUpdatePurchase: (id: string, payload: { description?: string; item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string }) => Promise<void>;
   onUpdatePackage: (id: string, payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
   onCreatePackage?: (purchaseId: string, trackingNumber: string, shippingCost: number) => Promise<void>;
   onReassignPurchase?: (purchaseId: string, personId: string) => Promise<void>;
@@ -37,6 +39,8 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   userRole,
   onClose,
   onOpenPreviewInvoice,
+  onUploadInvoice,
+  onConfirmAttachInvoice,
   onUpdatePurchase,
   onUpdatePackage,
   onCreatePackage,
@@ -47,9 +51,10 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const isAdmin = userRole === 'admin';
 
   const [isEditingPurchase, setIsEditingPurchase] = useState<boolean>(false);
-  const [itemAmount, setItemAmount] = useState<number>(purchase?.item_amount || 0);
-  const [taxAmount, setTaxAmount] = useState<number>(purchase?.tax_amount || 0);
-  const [shippingCost, setShippingCost] = useState<number>(purchase?.shipping_cost || 0);
+  const [description, setDescription] = useState<string>(purchase?.description || '');
+  const [itemAmount, setItemAmount] = useState<string>(purchase?.item_amount.toString() || '0');
+  const [taxAmount, setTaxAmount] = useState<string>(purchase?.tax_amount.toString() || '0');
+  const [shippingCost, setShippingCost] = useState<string>(purchase?.shipping_cost.toString() || '0');
   const [invoiceUrl, setInvoiceUrl] = useState<string>(purchase?.invoice_url || '');
   const [detailPeriod, setDetailPeriod] = useState<string>(purchase?.detail_period || '');
 
@@ -71,13 +76,15 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const [isSubmittingDelete, setIsSubmittingDelete] = useState<boolean>(false);
   const [isSubmittingPurchase, setIsSubmittingPurchase] = useState<boolean>(false);
   const [isSubmittingPackage, setIsSubmittingPackage] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string>('');
 
   useEffect(() => {
     if (isOpen && purchase) {
-      setItemAmount(purchase.item_amount);
-      setTaxAmount(purchase.tax_amount);
-      setShippingCost(purchase.shipping_cost);
+      setDescription(purchase.description);
+      setItemAmount(purchase.item_amount.toString());
+      setTaxAmount(purchase.tax_amount.toString());
+      setShippingCost(purchase.shipping_cost.toString());
       setInvoiceUrl(purchase.invoice_url || '');
       setDetailPeriod(purchase.detail_period || '');
       setIsEditingPurchase(false);
@@ -107,9 +114,10 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
     setIsSubmittingPurchase(true);
     try {
       await onUpdatePurchase(purchase.id, {
-        item_amount: Number(itemAmount),
-        tax_amount: Number(taxAmount),
-        shipping_cost: Number(shippingCost),
+        description: description.trim(),
+        item_amount: Number(itemAmount.replace(',', '.')) || 0,
+        tax_amount: Number(taxAmount.replace(',', '.')) || 0,
+        shipping_cost: Number(shippingCost.replace(',', '.')) || 0,
         invoice_url: invoiceUrl,
         detail_period: detailPeriod,
       });
@@ -188,6 +196,24 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onUploadInvoice || !onConfirmAttachInvoice) return;
+    
+    setIsUploading(true);
+    setActionError('');
+    try {
+      await onUploadInvoice(file);
+      await onConfirmAttachInvoice(purchase.id, file.name, 'append');
+    } catch (error: any) {
+      console.error(error);
+      setActionError(language === 'es' ? 'Error al subir la factura' : 'Error uploading invoice');
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <Modal
       open={isOpen}
@@ -217,9 +243,10 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
             (!isEditingPurchase ? (
               <button
                 onClick={() => {
-                  setItemAmount(purchase.item_amount);
-                  setTaxAmount(purchase.tax_amount);
-                  setShippingCost(purchase.shipping_cost);
+                  setDescription(purchase.description);
+                  setItemAmount(purchase.item_amount.toString());
+                  setTaxAmount(purchase.tax_amount.toString());
+                  setShippingCost(purchase.shipping_cost.toString());
                   setInvoiceUrl(purchase.invoice_url || '');
                   setDetailPeriod(purchase.detail_period || '');
                   setIsEditingPurchase(true);
@@ -243,12 +270,16 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
               <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Periodo' : 'Period'}</p>
               <p className="font-mono tabular-nums text-sm font-bold text-ink dark:text-ink-dark">{purchase.detail_period || '-'}</p>
             </div>
-            <div>
-              <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.itemAmount}</p>
+            <div title={language === 'es' ? 'Valor total pagado de la orden' : 'Total value paid for the order'}>
+              <p className="flex justify-center items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">
+                {t.itemAmount} <HelpCircle className="h-3 w-3" />
+              </p>
               <p className="font-mono tabular-nums text-sm font-bold text-ink dark:text-ink-dark">{money(purchase.item_amount)}</p>
             </div>
-            <div>
-              <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.taxAmount}</p>
+            <div title={language === 'es' ? 'El impuesto se resta ya que se solicita después el reembolso' : 'Tax is subtracted as refund is requested later'}>
+              <p className="flex justify-center items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">
+                {t.taxAmount} <HelpCircle className="h-3 w-3" />
+              </p>
               <p className="font-mono tabular-nums text-sm font-bold text-ink-secondary dark:text-ink-secondary-dark">-{money(purchase.tax_amount)}</p>
             </div>
             <div>
@@ -261,8 +292,13 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-3 pt-2">
+          <div className="space-y-3 pt-2">
             <div>
+              <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Descripción' : 'Description'}</label>
+              <Input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full" />
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div>
               <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Periodo' : 'Period'}</label>
               <Select
                 value={detailPeriod}
@@ -271,30 +307,41 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                 className="w-full font-mono"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.itemAmount}</label>
-              <Input type="number" step="0.01" value={itemAmount} onChange={(e) => setItemAmount(parseFloat(e.target.value) || 0)} className="w-full font-mono" />
+            <div title={language === 'es' ? 'Valor total pagado de la orden' : 'Total value paid for the order'}>
+              <label className="mb-1 flex items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">
+                {t.itemAmount} <HelpCircle className="h-3 w-3" />
+              </label>
+              <Input type="text" inputMode="decimal" value={itemAmount} onChange={(e) => setItemAmount(e.target.value)} className="w-full font-mono" />
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.taxAmount}</label>
-              <Input type="number" step="0.01" value={taxAmount} onChange={(e) => setTaxAmount(parseFloat(e.target.value) || 0)} className="w-full font-mono" />
+            <div title={language === 'es' ? 'El impuesto se resta ya que se solicita después el reembolso' : 'Tax is subtracted as refund is requested later'}>
+              <label className="mb-1 flex items-center gap-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">
+                {t.taxAmount} <HelpCircle className="h-3 w-3" />
+              </label>
+              <Input type="text" inputMode="decimal" value={taxAmount} onChange={(e) => setTaxAmount(e.target.value)} className="w-full font-mono" />
             </div>
             <div>
               <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.shippingCost}</label>
-              <div className="relative">
-                <Input type="number" step="0.01" value={shippingCost} disabled className="w-full font-mono opacity-60" />
-                <Package className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted dark:text-ink-muted-dark" />
-              </div>
+              <Input type="text" inputMode="decimal" value={shippingCost} disabled className="w-full font-mono opacity-60" />
+            </div>
             </div>
           </div>
         )}
 
         {/* Invoice PDF Section */}
         <div className="mt-4 space-y-2 border-t border-line pt-3 text-xs dark:border-line-dark">
-          <span className="flex items-center gap-1.5 font-semibold text-ink-secondary dark:text-ink-secondary-dark">
-            <FileText className="h-4 w-4 text-accent" />
-            <span>{t.invoicePdf}</span>
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 font-semibold text-ink-secondary dark:text-ink-secondary-dark">
+              <FileText className="h-4 w-4 text-accent" />
+              <span>{t.invoicePdf}</span>
+            </span>
+            {isAdmin && onUploadInvoice && (
+              <label className={`flex cursor-pointer items-center gap-1.5 rounded-xl border border-line bg-panel px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent/30 hover:bg-black/[0.02] dark:border-line-dark dark:bg-panel-dark dark:text-ink-dark dark:hover:bg-white/[0.02] ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                <Upload className="h-3.5 w-3.5 text-accent" />
+                <span>{isUploading ? (language === 'es' ? 'Subiendo...' : 'Uploading...') : (language === 'es' ? 'Subir Factura' : 'Upload Invoice')}</span>
+                <input type="file" accept="application/pdf" className="hidden" onChange={handleFileUpload} />
+              </label>
+            )}
+          </div>
 
           {attachedInvoices.length === 0 ? (
             <p className="italic text-ink-muted dark:text-ink-muted-dark">{t.noInvoice}</p>
@@ -470,12 +517,20 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
               <p className="rounded-xl border border-danger/30 bg-danger/10 p-2.5 text-xs text-danger">{actionError}</p>
             )}
 
-            {!isReassigning ? (
-              <Button size="sm" variant="secondary" onClick={() => setIsReassigning(true)}>
-                <UserCog className="h-3.5 w-3.5 text-accent" />
-                <span>{t.reassign}</span>
-              </Button>
-            ) : (
+            {!isReassigning && !showDeleteConfirm && (
+              <div className="flex items-center justify-between">
+                <Button size="sm" variant="secondary" onClick={() => setIsReassigning(true)}>
+                  <UserCog className="h-3.5 w-3.5 text-accent" />
+                  <span>{t.reassign}</span>
+                </Button>
+                <Button size="sm" variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>{t.deleteOrder}</span>
+                </Button>
+              </div>
+            )}
+            
+            {isReassigning && (
               <div className="rounded-2xl border border-line bg-panel p-4 space-y-3 dark:border-line-dark dark:bg-panel">
                 <div>
                   <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.reassignAction}</label>
@@ -513,12 +568,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
               </div>
             )}
 
-            {!showDeleteConfirm ? (
-              <Button size="sm" variant="danger" onClick={() => setShowDeleteConfirm(true)}>
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>{t.deleteOrder}</span>
-              </Button>
-            ) : (
+            {showDeleteConfirm && (
               <div className="space-y-3 rounded-2xl border border-danger/30 bg-panel p-4 dark:bg-panel-dark">
                 <p className="text-xs font-bold text-danger">{t.deleteOrderConfirmTitle}</p>
                 <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.deleteOrderConfirmBody}</p>

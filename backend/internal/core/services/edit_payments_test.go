@@ -31,7 +31,7 @@ func TestUpdatePurchaseItem_DoesNotWipeOrphanedPersonPayments(t *testing.T) {
 
 	service := services.NewDebtService(repo, audit, &fakeUserRepository{}, repo)
 
-	_, err = service.UpdatePurchaseItem(context.Background(), order.ID, order.ItemAmount, order.TaxAmount, order.ShippingCost, "", order.DetailPeriod)
+	_, err = service.UpdatePurchaseItem(context.Background(), order.ID, order.Description, order.ItemAmount, order.TaxAmount, order.ShippingCost, "", order.DetailPeriod)
 	require.NoError(t, err)
 
 	got, err := repo.FindPersonByID(context.Background(), p.ID)

@@ -96,6 +96,7 @@ func (handler *DebtHandler) UpdatePurchase(ginContext *gin.Context) {
 	purchase, err := handler.debtUseCase.UpdatePurchaseItem(
 		ginContext.Request.Context(),
 		id,
+		requestPayload.Description,
 		requestPayload.ItemAmount,
 		requestPayload.TaxAmount,
 		requestPayload.ShippingCost,

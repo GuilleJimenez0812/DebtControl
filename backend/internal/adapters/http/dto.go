@@ -50,6 +50,7 @@ type CreatePurchaseRequest struct {
 }
 
 type UpdatePurchaseRequest struct {
+	Description  string  `json:"description"`
 	ItemAmount   float64 `json:"item_amount" binding:"gte=0"`
 	TaxAmount    float64 `json:"tax_amount" binding:"gte=0"`
 	ShippingCost float64 `json:"shipping_cost" binding:"gte=0"`

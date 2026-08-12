@@ -192,7 +192,7 @@ type DebtUseCase interface {
 	GetDashboardSummaryForUser(ctx context.Context, user *domain.User) (*DashboardSummary, error)
 	ListPersonsForUser(ctx context.Context, user *domain.User) ([]*domain.Person, error)
 	CreatePurchaseItem(ctx context.Context, personName string, orderNumber string, description string, amount float64, tax float64, shipping float64, detailPeriod string) (*domain.PurchaseItem, error)
-	UpdatePurchaseItem(ctx context.Context, id string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string, detailPeriod string) (*domain.PurchaseItem, error)
+	UpdatePurchaseItem(ctx context.Context, id string, description string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string, detailPeriod string) (*domain.PurchaseItem, error)
 	UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error)
 	CreateShippingPackage(ctx context.Context, purchaseID string, trackingNumber string, shippingCost float64) (*domain.ShippingPackage, error)
 	ReassignPurchaseToPerson(ctx context.Context, orderID string, newPersonID string) (*domain.PurchaseItem, error)
