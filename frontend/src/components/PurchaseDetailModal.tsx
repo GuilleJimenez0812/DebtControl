@@ -19,7 +19,7 @@ interface PurchaseDetailModalProps {
   userRole?: string;
   onClose: () => void;
   onOpenPreviewInvoice?: (url: string) => void;
-  onUpdatePurchase: (id: string, payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string }) => Promise<void>;
+  onUpdatePurchase: (id: string, payload: { description?: string; item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string }) => Promise<void>;
   onUpdatePackage: (id: string, payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
   onCreatePackage?: (purchaseId: string, trackingNumber: string, shippingCost: number) => Promise<void>;
   onReassignPurchase?: (purchaseId: string, personId: string) => Promise<void>;
@@ -47,6 +47,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const isAdmin = userRole === 'admin';
 
   const [isEditingPurchase, setIsEditingPurchase] = useState<boolean>(false);
+  const [description, setDescription] = useState<string>(purchase?.description || '');
   const [itemAmount, setItemAmount] = useState<number>(purchase?.item_amount || 0);
   const [taxAmount, setTaxAmount] = useState<number>(purchase?.tax_amount || 0);
   const [shippingCost, setShippingCost] = useState<number>(purchase?.shipping_cost || 0);
@@ -75,6 +76,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
 
   useEffect(() => {
     if (isOpen && purchase) {
+      setDescription(purchase.description);
       setItemAmount(purchase.item_amount);
       setTaxAmount(purchase.tax_amount);
       setShippingCost(purchase.shipping_cost);
@@ -107,6 +109,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
     setIsSubmittingPurchase(true);
     try {
       await onUpdatePurchase(purchase.id, {
+        description: description.trim(),
         item_amount: Number(itemAmount),
         tax_amount: Number(taxAmount),
         shipping_cost: Number(shippingCost),
@@ -217,6 +220,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
             (!isEditingPurchase ? (
               <button
                 onClick={() => {
+                  setDescription(purchase.description);
                   setItemAmount(purchase.item_amount);
                   setTaxAmount(purchase.tax_amount);
                   setShippingCost(purchase.shipping_cost);
@@ -261,8 +265,13 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-3 pt-2">
+          <div className="space-y-3 pt-2">
             <div>
+              <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Descripción' : 'Description'}</label>
+              <Input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full" />
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              <div>
               <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Periodo' : 'Period'}</label>
               <Select
                 value={detailPeriod}
@@ -284,6 +293,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
               <div className="relative">
                 <Input type="number" step="0.01" value={shippingCost} disabled className="w-full font-mono opacity-60" />
                 <Package className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted dark:text-ink-muted-dark" />
+              </div>
               </div>
             </div>
           </div>

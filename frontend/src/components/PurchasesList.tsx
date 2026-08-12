@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { PurchaseItem, ShippingPackage } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
@@ -30,6 +30,8 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
   onSelectPurchase,
 }) => {
   const t = translations[language];
+  const [pendingWarehouseOnly, setPendingWarehouseOnly] = useState(false);
+  const [pendingPersonalOnly, setPendingPersonalOnly] = useState(false);
 
   const uniquePersons = Array.from(new Set(purchases.map((p) => p.person_name)));
   const uniquePeriods = Array.from(new Set(purchases.map((p) => p.detail_period || 'N/A'))).filter(Boolean);
@@ -47,7 +49,20 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
   const filteredPurchases = purchases.filter((item) => {
     const matchesPerson = selectedPersonFilter === 'All' || item.person_name === selectedPersonFilter;
     const matchesPeriod = selectedPeriodFilter === 'All' || item.detail_period === selectedPeriodFilter;
-    return matchesPerson && matchesPeriod;
+    
+    const itemPackages = packages.filter(pkg => pkg.purchase_item_id === item.id && pkg.tracking_number);
+    
+    let matchesWarehouse = true;
+    if (pendingWarehouseOnly) {
+      matchesWarehouse = itemPackages.length > 0 && itemPackages.some(pkg => !pkg.warehouse_received);
+    }
+    
+    let matchesPersonal = true;
+    if (pendingPersonalOnly) {
+      matchesPersonal = itemPackages.length > 0 && itemPackages.some(pkg => !pkg.personally_received);
+    }
+
+    return matchesPerson && matchesPeriod && matchesWarehouse && matchesPersonal;
   });
 
   return (
@@ -69,6 +84,14 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
         <div className="flex flex-wrap items-center gap-3">
           <Select value={selectedPersonFilter} onValueChange={onPersonFilterChange} options={personOptions} />
           <Select value={selectedPeriodFilter} onValueChange={onPeriodFilterChange} options={periodOptions} />
+          <label className="flex items-center gap-1.5 text-sm text-ink-secondary dark:text-ink-secondary-dark cursor-pointer">
+            <input type="checkbox" checked={pendingWarehouseOnly} onChange={e => setPendingWarehouseOnly(e.target.checked)} className="rounded accent-accent" />
+            <span>{language === 'es' ? 'Pendiente Almacén' : 'Pending Warehouse'}</span>
+          </label>
+          <label className="flex items-center gap-1.5 text-sm text-ink-secondary dark:text-ink-secondary-dark cursor-pointer">
+            <input type="checkbox" checked={pendingPersonalOnly} onChange={e => setPendingPersonalOnly(e.target.checked)} className="rounded accent-accent" />
+            <span>{language === 'es' ? 'Pendiente Personal' : 'Pending Personal'}</span>
+          </label>
         </div>
       </div>
 
@@ -86,6 +109,8 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                   <th className="py-3 px-2">{t.person}</th>
                   <th className="py-3 px-2">{language === 'es' ? 'Orden / Artículo' : 'Order / Item'}</th>
                   <th className="py-3 px-2">{language === 'es' ? 'Alertas' : 'Alerts'}</th>
+                  <th className="py-3 px-2">{language === 'es' ? 'Almacén' : 'Warehouse'}</th>
+                  <th className="py-3 px-2">{language === 'es' ? 'Personal' : 'Personal'}</th>
                   <th className="py-3 px-2">{t.itemAmount}</th>
                   <th className="py-3 px-2">{t.taxAmount}</th>
                   <th className="py-3 px-2">{t.shippingCost}</th>
@@ -96,8 +121,19 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
               </thead>
               <tbody className="divide-y divide-line text-sm dark:divide-line-dark">
                 {filteredPurchases.map((item) => {
+                  const itemPackages = packages.filter(pkg => pkg.purchase_item_id === item.id && pkg.tracking_number);
                   const hasInvoice = !!item.invoice_url;
-                  const hasTracking = packages.some(pkg => pkg.purchase_item_id === item.id && pkg.tracking_number);
+                  const hasTracking = itemPackages.length > 0;
+                  const warehouseReceivedCount = itemPackages.filter(pkg => pkg.warehouse_received).length;
+                  const personalReceivedCount = itemPackages.filter(pkg => pkg.personally_received).length;
+                  const totalTrackings = itemPackages.length;
+                  
+                  const renderTrackingStatus = (received: number, total: number) => {
+                    if (total === 0) return <span className="text-ink-muted dark:text-ink-muted-dark">-</span>;
+                    if (received === total) return <span className="text-success text-xs font-bold">✓</span>;
+                    return <span className="text-error text-xs font-bold whitespace-nowrap">{received} / {total}</span>;
+                  };
+
                   return (
                   <tr
                     key={item.id}
@@ -129,6 +165,8 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                         )}
                       </div>
                     </td>
+                    <td className="py-3.5 px-2">{renderTrackingStatus(warehouseReceivedCount, totalTrackings)}</td>
+                    <td className="py-3.5 px-2">{renderTrackingStatus(personalReceivedCount, totalTrackings)}</td>
                     <td className="py-3.5 px-2 font-mono tabular-nums text-ink-secondary dark:text-ink-secondary-dark">{money(item.item_amount)}</td>
                     <td className="py-3.5 px-2 font-mono tabular-nums text-ink-tertiary dark:text-ink-tertiary-dark">-{money(item.tax_amount)}</td>
                     <td className="py-3.5 px-2 font-mono tabular-nums text-ink-tertiary dark:text-ink-tertiary-dark">{money(item.shipping_cost)}</td>
@@ -153,8 +191,23 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
           {/* Mobile: cards (≤md, ADR-0002) */}
           <div className="md:hidden grid grid-cols-1 gap-3">
             {filteredPurchases.map((item) => {
+              const itemPackages = packages.filter(pkg => pkg.purchase_item_id === item.id && pkg.tracking_number);
               const hasInvoice = !!item.invoice_url;
-              const hasTracking = packages.some(pkg => pkg.purchase_item_id === item.id && pkg.tracking_number);
+              const hasTracking = itemPackages.length > 0;
+              const warehouseReceivedCount = itemPackages.filter(pkg => pkg.warehouse_received).length;
+              const personalReceivedCount = itemPackages.filter(pkg => pkg.personally_received).length;
+              const totalTrackings = itemPackages.length;
+              
+              const renderTrackingStatusMobile = (label: string, received: number, total: number) => {
+                if (total === 0) return null;
+                const isComplete = received === total;
+                return (
+                  <span className={`px-2 py-0.5 rounded-[6px] text-[11px] font-semibold flex items-center gap-1 ${isComplete ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
+                    {label}: {isComplete ? '✓' : `${received}/${total}`}
+                  </span>
+                );
+              };
+
               return (
               <div
                 key={item.id}
@@ -179,6 +232,12 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                     </span>
                   </div>
                 </div>
+                {totalTrackings > 0 && (
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    {renderTrackingStatusMobile(language === 'es' ? 'Alm' : 'Whs', warehouseReceivedCount, totalTrackings)}
+                    {renderTrackingStatusMobile(language === 'es' ? 'Per' : 'Per', personalReceivedCount, totalTrackings)}
+                  </div>
+                )}
                 {item.description && item.description !== item.order_number && (
                   <p className="text-xs text-ink-tertiary mb-2 dark:text-ink-tertiary-dark">{item.description}</p>
                 )}

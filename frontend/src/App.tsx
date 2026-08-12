@@ -132,7 +132,7 @@ const DashboardContent: React.FC = () => {
   });
 
   const updatePurchaseMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string } }) =>
+    mutationFn: ({ id, payload }: { id: string; payload: { description?: string; item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string } }) =>
       apiService.updatePurchase(id, payload),
     onSuccess: () => {
       queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
