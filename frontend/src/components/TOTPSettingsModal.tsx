@@ -134,7 +134,7 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, la
                 : 'When enabled, you\u2019ll be asked for a code from your authenticator app (Google Authenticator, Authy, 1Password, etc.) after signing in.'}
               </p>
             </div>
-            <Button type="submit" disabled={loading} className="w-full">
+            <Button type="submit" isLoading={loading} disabled={loading} className="w-full">
               {loading ? t.processing : t.setupTotp}
             </Button>
           </form>
@@ -174,7 +174,7 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, la
               <Button type="button" variant="secondary" onClick={() => setSetupStep('idle')} className="flex-1">
                 {t.cancel}
               </Button>
-              <Button type="submit" disabled={loading || code.length !== 6} variant="success" className="flex-1">
+              <Button type="submit" isLoading={loading} disabled={loading || code.length !== 6} variant="success" className="flex-1">
                 {loading ? t.verifying : t.confirmEnableTotp}
               </Button>
             </div>
@@ -204,7 +204,7 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, la
                 className="w-full text-center font-mono text-lg tracking-[0.5em]"
               />
             </div>
-            <Button type="submit" disabled={loading || code.length !== 6} variant="danger" className="w-full">
+            <Button type="submit" isLoading={loading} disabled={loading || code.length !== 6} variant="danger" className="w-full">
               {loading ? t.processing : t.disableTotp}
             </Button>
           </form>

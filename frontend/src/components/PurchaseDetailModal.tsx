@@ -17,7 +17,7 @@ interface PurchaseDetailModalProps {
   userRole?: string;
   onClose: () => void;
   onOpenPreviewInvoice?: (url: string) => void;
-  onUpdatePurchase: (id: string, payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string }) => Promise<void>;
+  onUpdatePurchase: (id: string, payload: { item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string }) => Promise<void>;
   onUpdatePackage: (id: string, payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
   onCreatePackage?: (purchaseId: string, trackingNumber: string, shippingCost: number) => Promise<void>;
   onReassignPurchase?: (purchaseId: string, personId: string) => Promise<void>;
@@ -49,6 +49,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const [taxAmount, setTaxAmount] = useState<number>(purchase?.tax_amount || 0);
   const [shippingCost, setShippingCost] = useState<number>(purchase?.shipping_cost || 0);
   const [invoiceUrl, setInvoiceUrl] = useState<string>(purchase?.invoice_url || '');
+  const [detailPeriod, setDetailPeriod] = useState<string>(purchase?.detail_period || '');
 
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
   const [pkgShippingCost, setPkgShippingCost] = useState<number>(0);
@@ -66,6 +67,8 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const [isSubmittingReassign, setIsSubmittingReassign] = useState<boolean>(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [isSubmittingDelete, setIsSubmittingDelete] = useState<boolean>(false);
+  const [isSubmittingPurchase, setIsSubmittingPurchase] = useState<boolean>(false);
+  const [isSubmittingPackage, setIsSubmittingPackage] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string>('');
 
   useEffect(() => {
@@ -74,6 +77,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
       setTaxAmount(purchase.tax_amount);
       setShippingCost(purchase.shipping_cost);
       setInvoiceUrl(purchase.invoice_url || '');
+      setDetailPeriod(purchase.detail_period || '');
       setIsEditingPurchase(false);
       setEditingPkgId(null);
       setIsAddingTracking(false);
@@ -98,13 +102,19 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const reassignCandidates = (persons || []).filter((p) => p.id !== purchase.person_id);
 
   const handleSavePurchase = async () => {
-    await onUpdatePurchase(purchase.id, {
-      item_amount: Number(itemAmount),
-      tax_amount: Number(taxAmount),
-      shipping_cost: Number(shippingCost),
-      invoice_url: invoiceUrl,
-    });
-    setIsEditingPurchase(false);
+    setIsSubmittingPurchase(true);
+    try {
+      await onUpdatePurchase(purchase.id, {
+        item_amount: Number(itemAmount),
+        tax_amount: Number(taxAmount),
+        shipping_cost: Number(shippingCost),
+        invoice_url: invoiceUrl,
+        detail_period: detailPeriod,
+      });
+      setIsEditingPurchase(false);
+    } finally {
+      setIsSubmittingPurchase(false);
+    }
   };
 
   const handleStartEditPackage = (pkg: ShippingPackage) => {
@@ -116,13 +126,18 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   };
 
   const handleSavePackage = async (pkgId: string) => {
-    await onUpdatePackage(pkgId, {
-      shipping_cost: Number(pkgShippingCost),
-      warehouse_received: pkgWarehouse,
-      personally_received: pkgPersonally,
-      dispatch_date: pkgDispatchDate,
-    });
-    setEditingPkgId(null);
+    setIsSubmittingPackage(true);
+    try {
+      await onUpdatePackage(pkgId, {
+        shipping_cost: Number(pkgShippingCost),
+        warehouse_received: pkgWarehouse,
+        personally_received: pkgPersonally,
+        dispatch_date: pkgDispatchDate,
+      });
+      setEditingPkgId(null);
+    } finally {
+      setIsSubmittingPackage(false);
+    }
   };
 
   const handleAddTracking = async () => {
@@ -204,6 +219,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                   setTaxAmount(purchase.tax_amount);
                   setShippingCost(purchase.shipping_cost);
                   setInvoiceUrl(purchase.invoice_url || '');
+                  setDetailPeriod(purchase.detail_period || '');
                   setIsEditingPurchase(true);
                 }}
                 className="flex items-center gap-1 text-xs font-semibold text-accent hover:text-accent-hover dark:hover:text-accent-hover-dark"
@@ -212,7 +228,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                 <span>{language === 'es' ? 'Editar montos' : 'Edit amounts'}</span>
               </button>
             ) : (
-              <Button size="sm" variant="success" onClick={handleSavePurchase}>
+              <Button size="sm" variant="success" onClick={handleSavePurchase} isLoading={isSubmittingPurchase}>
                 <Save className="h-3.5 w-3.5" />
                 <span>{t.saveChanges}</span>
               </Button>
@@ -221,6 +237,10 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
 
         {!isEditingPurchase ? (
           <div className="grid grid-cols-4 gap-3 border-t border-line pt-3 text-center dark:border-line-dark">
+            <div>
+              <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Periodo' : 'Period'}</p>
+              <p className="font-mono tabular-nums text-sm font-bold text-ink dark:text-ink-dark">{purchase.detail_period || '-'}</p>
+            </div>
             <div>
               <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.itemAmount}</p>
               <p className="font-mono tabular-nums text-sm font-bold text-ink dark:text-ink-dark">{money(purchase.item_amount)}</p>
@@ -233,13 +253,17 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
               <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.shippingCost}</p>
               <p className="font-mono tabular-nums text-sm font-bold text-ink-secondary dark:text-ink-secondary-dark">{money(purchase.shipping_cost)}</p>
             </div>
-            <div className="rounded-xl bg-accent/10 p-2">
+            <div className="col-span-4 rounded-xl bg-accent/10 p-2 mt-2">
               <p className="text-xs font-semibold text-accent">{t.totalCost}</p>
               <p className="font-mono tabular-nums text-base font-extrabold text-accent">{money(purchase.total_cost)}</p>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-3 pt-2">
+          <div className="grid grid-cols-4 gap-3 pt-2">
+            <div>
+              <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Periodo' : 'Period'}</label>
+              <Input type="text" value={detailPeriod} onChange={(e) => setDetailPeriod(e.target.value)} className="w-full font-mono" placeholder="Julio-26" />
+            </div>
             <div>
               <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.itemAmount}</label>
               <Input type="number" step="0.01" value={itemAmount} onChange={(e) => setItemAmount(parseFloat(e.target.value) || 0)} className="w-full font-mono" />
@@ -323,7 +347,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                         <span>{language === 'es' ? 'Actualizar' : 'Update'}</span>
                       </button>
                     ) : (
-                      <Button size="sm" variant="success" onClick={() => handleSavePackage(pkg.id)}>
+                      <Button size="sm" variant="success" onClick={() => handleSavePackage(pkg.id)} isLoading={isSubmittingPackage}>
                         <Save className="h-3.5 w-3.5" />
                         <span>{t.saveChanges}</span>
                       </Button>
@@ -412,7 +436,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                     className="w-20 font-mono"
                   />
                 </div>
-                <Button size="sm" onClick={handleAddTracking} disabled={isSubmittingTracking || !newTrackingNumber.trim()}>
+                <Button size="sm" onClick={handleAddTracking} isLoading={isSubmittingTracking} disabled={isSubmittingTracking || !newTrackingNumber.trim()}>
                   {isSubmittingTracking ? t.saving : t.save}
                 </Button>
                 <button
@@ -465,7 +489,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                 )}
 
                 <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={handleReassign} disabled={isSubmittingReassign || !reassignTargetId}>
+                  <Button size="sm" onClick={handleReassign} isLoading={isSubmittingReassign} disabled={isSubmittingReassign || !reassignTargetId}>
                     {isSubmittingReassign ? t.reassigning : t.reassignAction}
                   </Button>
                   <button
@@ -492,7 +516,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                 <p className="text-xs font-bold text-danger">{t.deleteOrderConfirmTitle}</p>
                 <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.deleteOrderConfirmBody}</p>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="danger" onClick={handleDelete} disabled={isSubmittingDelete}>
+                  <Button size="sm" variant="danger" onClick={handleDelete} isLoading={isSubmittingDelete}>
                     {isSubmittingDelete ? t.deleting : t.confirmDelete}
                   </Button>
                   <button

@@ -136,8 +136,8 @@ export const NewPaymentModal: React.FC<NewPaymentModalProps> = ({
         </div>
 
         <div className="pt-2">
-          <Button type="submit" variant="success" disabled={loading || amountPaid <= 0} className="w-full">
-            {loading ? t.processing : t.confirmPayment}
+          <Button type="submit" variant="success" isLoading={loading} disabled={loading || amountPaid <= 0} className="w-full">
+            {loading ? (language === 'es' ? 'Guardando...' : 'Saving...') : (language === 'es' ? 'Guardar Pago' : 'Save Payment')}
           </Button>
         </div>
       </form>

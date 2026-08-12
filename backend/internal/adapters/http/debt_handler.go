@@ -100,6 +100,7 @@ func (handler *DebtHandler) UpdatePurchase(ginContext *gin.Context) {
 		requestPayload.TaxAmount,
 		requestPayload.ShippingCost,
 		requestPayload.InvoiceURL,
+		requestPayload.DetailPeriod,
 	)
 
 	if err != nil {

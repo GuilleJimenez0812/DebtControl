@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 // SecurityOptions wires the anti-bruteforce guards into the router.
@@ -23,6 +24,7 @@ type SecurityOptions struct {
 	// (per IP).
 	ResetVerifyPolicies []ratelimit.Policy
 	TurnstileSecret     string
+	RedisClient         *redis.Client
 }
 
 func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase, allowedOrigins []string, registrationEnabled bool, security SecurityOptions) *gin.Engine {
@@ -44,6 +46,7 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 	adminHandler := NewAdminHandler(adminUseCase)
 
 	apiGroup := routerEngine.Group("/api/v1")
+	apiGroup.Use(IdempotencyMiddleware(security.RedisClient))
 	if security.RateLimiter != nil && len(security.GlobalPolicies) > 0 {
 		apiGroup.Use(RateLimitMiddleware(security.RateLimiter, "api", security.GlobalPolicies, nil))
 	}

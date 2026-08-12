@@ -4,7 +4,7 @@ import type { ParseInvoiceResult } from '../services/api';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
 import { generateMonthPeriodOptions } from './NewPurchaseModal';
-import { UploadCloud, AlertCircle, PlusCircle, CheckCircle2, User, Tag, FileText, Layers, Eye } from 'lucide-react';
+import { UploadCloud, CheckCircle2, AlertCircle, User, Tag, FileText, Layers, Eye } from 'lucide-react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
@@ -184,8 +184,8 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
             </Button>
           )}
 
-          <Button type="submit" disabled={!file || loading} className="w-full">
-            <span>{loading ? t.analyzingInvoice : t.matchInvoice}</span>
+          <Button type="submit" isLoading={loading} disabled={!file || loading} className="w-full">
+            {loading ? t.analyzingInvoice : t.matchInvoice}
           </Button>
         </form>
       ) : (
@@ -290,8 +290,7 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
                 <Button variant="ghost" className="w-1/3" onClick={() => setResult(null)}>
                   {t.cancel}
                 </Button>
-                <Button variant="success" className="w-2/3" onClick={() => handleAcceptMatch(result.matched_purchase_item!)} disabled={loading}>
-                  <CheckCircle2 className="h-4 w-4" />
+                <Button variant="success" className="w-2/3" onClick={() => handleAcceptMatch(result.matched_purchase_item!)} isLoading={loading}>
                   <span>{loading ? t.attaching : t.acceptAttachInvoice}</span>
                 </Button>
               </div>
@@ -328,8 +327,7 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
                 />
               </div>
 
-              <Button onClick={handleCreateUnmatchedPurchase} disabled={loading} className="w-full">
-                <PlusCircle className="h-4 w-4" />
+              <Button onClick={handleCreateUnmatchedPurchase} isLoading={loading} className="w-full">
                 <span>{loading ? t.creatingOrder : t.createNewOrderWithInvoice}</span>
               </Button>
             </div>

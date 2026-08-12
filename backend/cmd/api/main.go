@@ -152,6 +152,7 @@ func main() {
 	securityOptions := httpAdapter.SecurityOptions{
 		RateLimiter:     rateLimiter,
 		TurnstileSecret: getEnvOrDefault("TURNSTILE_SECRET", ""),
+		RedisClient:     redisClient,
 		// Login: per IP+account, 5 per 15 minutes (credential stuffing resistant).
 		LoginPolicies: []ratelimit.Policy{
 			{Limit: 5, Window: 15 * time.Minute},
