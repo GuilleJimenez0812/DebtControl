@@ -249,7 +249,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
             </div>
             <div>
               <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.taxAmount}</p>
-              <p className="font-mono tabular-nums text-sm font-bold text-ink-secondary dark:text-ink-secondary-dark">{money(purchase.tax_amount)}</p>
+              <p className="font-mono tabular-nums text-sm font-bold text-ink-secondary dark:text-ink-secondary-dark">-{money(purchase.tax_amount)}</p>
             </div>
             <div>
               <p className="text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.shippingCost}</p>

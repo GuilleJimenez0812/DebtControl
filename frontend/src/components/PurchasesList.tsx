@@ -108,7 +108,7 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                       )}
                     </td>
                     <td className="py-3.5 px-2 font-mono tabular-nums text-ink-secondary dark:text-ink-secondary-dark">{money(item.item_amount)}</td>
-                    <td className="py-3.5 px-2 font-mono tabular-nums text-ink-tertiary dark:text-ink-tertiary-dark">{money(item.tax_amount)}</td>
+                    <td className="py-3.5 px-2 font-mono tabular-nums text-ink-tertiary dark:text-ink-tertiary-dark">-{money(item.tax_amount)}</td>
                     <td className="py-3.5 px-2 font-mono tabular-nums text-ink-tertiary dark:text-ink-tertiary-dark">{money(item.shipping_cost)}</td>
                     <td className="py-3.5 px-2 font-mono tabular-nums font-bold text-ink dark:text-ink-dark">{money(item.total_cost)}</td>
                     <td className="py-3.5 px-2">
@@ -154,7 +154,7 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-ink-tertiary dark:text-ink-tertiary-dark">Tax</p>
-                    <p className="font-mono tabular-nums text-xs text-ink-secondary dark:text-ink-secondary-dark">{money(item.tax_amount)}</p>
+                    <p className="font-mono tabular-nums text-xs text-ink-secondary dark:text-ink-secondary-dark">-{money(item.tax_amount)}</p>
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-ink-tertiary dark:text-ink-tertiary-dark">Ship</p>
