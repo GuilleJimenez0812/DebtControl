@@ -39,6 +39,12 @@ func IdempotencyMiddleware(redisClient *redis.Client) gin.HandlerFunc {
 			return
 		}
 
+		path := c.Request.URL.Path
+		if path == "/api/v1/auth/login" || path == "/api/v1/auth/refresh" {
+			c.Next()
+			return
+		}
+
 		idempotencyKey := c.GetHeader("X-Idempotency-Key")
 		if idempotencyKey == "" {
 			c.Next()

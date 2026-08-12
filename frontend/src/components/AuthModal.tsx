@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { Mail, Lock, User, Eye, EyeOff, ShieldCheck, KeyRound } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ShieldCheck, KeyRound, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
@@ -142,9 +142,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <Modal open={isOpen} onClose={onClose} width="sm">
-      <div className="relative -m-6 overflow-hidden rounded-[14px] min-h-[420px]">
-        {/* apple.com glow */}
+    <Modal open={isOpen} onClose={onClose} className="overflow-hidden p-0" showClose={false} width="sm">
+      <div className="relative bg-panel dark:bg-panel-dark">
+        {/* Custom Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 z-50 rounded-full p-1.5 text-ink-muted transition hover:bg-black/5 hover:text-ink dark:text-ink-muted-dark dark:hover:bg-white/10 dark:hover:text-ink-dark"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Decorative Gradients */}
         <div aria-hidden className="pointer-events-none absolute inset-0">
           <div className="absolute -left-16 -top-20 h-72 w-72 rounded-full bg-[#BF5AF2]/35 blur-[100px]" />
           <div className="absolute -right-16 top-1/3 h-72 w-72 rounded-full bg-[#0071E3]/35 blur-[100px]" />
