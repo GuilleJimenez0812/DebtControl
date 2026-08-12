@@ -54,7 +54,7 @@ func (handler *AuthHandler) RegistrationStatus(ginContext *gin.Context) {
 
 func (handler *AuthHandler) Register(ginContext *gin.Context) {
 	var requestPayload RegisterRequest
-	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+	if err := ginContext.ShouldBindBodyWithJSON(&requestPayload); err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -79,7 +79,7 @@ func (handler *AuthHandler) Register(ginContext *gin.Context) {
 
 func (handler *AuthHandler) Login(ginContext *gin.Context) {
 	var requestPayload LoginRequest
-	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+	if err := ginContext.ShouldBindBodyWithJSON(&requestPayload); err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -112,7 +112,7 @@ func (handler *AuthHandler) Login(ginContext *gin.Context) {
 
 func (handler *AuthHandler) CompleteLoginWithTOTP(ginContext *gin.Context) {
 	var requestPayload MFALoginRequest
-	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+	if err := ginContext.ShouldBindBodyWithJSON(&requestPayload); err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -218,7 +218,7 @@ func (handler *AuthHandler) GenerateTOTP(ginContext *gin.Context) {
 
 func (handler *AuthHandler) EnableTOTP(ginContext *gin.Context) {
 	var requestPayload TOTPCodeRequest
-	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+	if err := ginContext.ShouldBindBodyWithJSON(&requestPayload); err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -240,7 +240,7 @@ func (handler *AuthHandler) EnableTOTP(ginContext *gin.Context) {
 
 func (handler *AuthHandler) DisableTOTP(ginContext *gin.Context) {
 	var requestPayload TOTPCodeRequest
-	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+	if err := ginContext.ShouldBindBodyWithJSON(&requestPayload); err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -262,7 +262,7 @@ func (handler *AuthHandler) DisableTOTP(ginContext *gin.Context) {
 
 func (handler *AuthHandler) RequestPasswordReset(ginContext *gin.Context) {
 	var requestPayload RequestPasswordResetRequest
-	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+	if err := ginContext.ShouldBindBodyWithJSON(&requestPayload); err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -279,7 +279,7 @@ func (handler *AuthHandler) RequestPasswordReset(ginContext *gin.Context) {
 
 func (handler *AuthHandler) VerifyPasswordResetOTP(ginContext *gin.Context) {
 	var requestPayload VerifyPasswordResetOTPRequest
-	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+	if err := ginContext.ShouldBindBodyWithJSON(&requestPayload); err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -295,7 +295,7 @@ func (handler *AuthHandler) VerifyPasswordResetOTP(ginContext *gin.Context) {
 
 func (handler *AuthHandler) ResetPassword(ginContext *gin.Context) {
 	var requestPayload ResetPasswordRequest
-	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+	if err := ginContext.ShouldBindBodyWithJSON(&requestPayload); err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -327,7 +327,7 @@ func (handler *AuthHandler) GetTOTPStatus(ginContext *gin.Context) {
 
 func (handler *AuthHandler) ChangePassword(ginContext *gin.Context) {
 	var requestPayload ChangePasswordRequest
-	if err := ginContext.ShouldBindJSON(&requestPayload); err != nil {
+	if err := ginContext.ShouldBindBodyWithJSON(&requestPayload); err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
