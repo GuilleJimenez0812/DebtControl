@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShieldCheck, QrCode, KeyRound } from 'lucide-react';
+import { ShieldCheck, QrCode, KeyRound } from 'lucide-react';
 import { apiService } from '../services/api';
+import type { Language } from '../i18n/translations';
+import { translations } from '../i18n/translations';
+import { Modal } from './ui/Modal';
+import { Input } from './ui/Input';
+import { Button } from './ui/Button';
 
 interface TOTPSettingsModalProps {
   isOpen: boolean;
+  language: Language;
   onClose: () => void;
 }
 
-export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, onClose }) => {
+export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, language, onClose }) => {
+  const t = translations[language];
   const [enabled, setEnabled] = useState<boolean>(false);
   const [setupStep, setSetupStep] = useState<'idle' | 'qr' | 'verify'>('idle');
   const [secret, setSecret] = useState<string>('');
@@ -17,28 +24,26 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, on
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
 
-  const loadStatus = async () => {
-    try {
-      const status = await apiService.getTOTPStatus();
-      setEnabled(status.totp_enabled);
-      setSetupStep('idle');
-      setSecret('');
-      setProvisioningUri('');
-      setCode('');
-      setError('');
-      setMessage('');
-    } catch {
-      setError('Failed to load security settings.');
-    }
-  };
-
   useEffect(() => {
     if (isOpen) {
+      const loadStatus = async () => {
+        try {
+          const status = await apiService.getTOTPStatus();
+          setEnabled(status.totp_enabled);
+          setSetupStep('idle');
+          setSecret('');
+          setProvisioningUri('');
+          setCode('');
+          setError('');
+          setMessage('');
+        } catch {
+          setError(language === 'es' ? 'No se pudieron cargar los ajustes de seguridad.' : 'Failed to load security settings.');
+        }
+      };
       loadStatus();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const handleBeginSetup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +55,7 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, on
       setProvisioningUri(result.provisioning_uri);
       setSetupStep('verify');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to start TOTP setup.');
+      setError(err instanceof Error ? err.message : (language === 'es' ? 'Error al iniciar la configuración TOTP.' : 'Failed to start TOTP setup.'));
     } finally {
       setLoading(false);
     }
@@ -62,12 +67,12 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, on
     setError('');
     try {
       await apiService.enableTOTP(code);
-      setMessage('Two-factor authentication enabled.');
+      setMessage(t.totpEnabled);
       setEnabled(true);
       setSetupStep('idle');
       setCode('');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Verification code invalid.');
+      setError(err instanceof Error ? err.message : t.invalidCode);
     } finally {
       setLoading(false);
     }
@@ -79,12 +84,12 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, on
     setError('');
     try {
       await apiService.disableTOTP(code);
-      setMessage('Two-factor authentication disabled.');
+      setMessage(t.totpDisabled);
       setEnabled(false);
       setSetupStep('idle');
       setCode('');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Invalid code. Cannot disable.');
+      setError(err instanceof Error ? err.message : (language === 'es' ? 'Código inválido. No se pudo desactivar.' : 'Invalid code. Cannot disable.'));
     } finally {
       setLoading(false);
     }
@@ -95,67 +100,65 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, on
     : '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="glass-panel w-full max-w-md p-6 rounded-2xl border border-slate-700 shadow-2xl relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-          <X className="w-5 h-5" />
-        </button>
-
-        <h3 className="text-xl font-bold text-white mb-1 flex items-center space-x-2">
-          <ShieldCheck className="w-5 h-5 text-indigo-400" />
-          <span>Security Settings</span>
-        </h3>
-        <p className="text-xs text-slate-400 mb-5">Two-factor authentication with an authenticator app</p>
+    <Modal open={isOpen} onClose={onClose} width="sm">
+      <div className="relative -m-6 overflow-hidden rounded-[14px] p-8">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-accent/10 text-accent dark:bg-accent/20">
+            <ShieldCheck className="h-5 w-5" />
+          </span>
+          <div>
+            <h3 className="text-xl font-bold text-ink dark:text-ink-dark">{t.securityTitle}</h3>
+            <p className="text-xs text-ink-secondary dark:text-ink-secondary-dark">{t.securityDesc}</p>
+          </div>
+        </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
-            {error}
-          </div>
+          <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-semibold text-danger">{error}</div>
         )}
         {message && (
-          <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-            {message}
-          </div>
+          <div className="mb-4 rounded-xl border border-success/30 bg-success/10 p-3 text-xs font-semibold text-success">{message}</div>
         )}
 
         {!enabled && setupStep === 'idle' && (
           <form onSubmit={handleBeginSetup} className="space-y-4">
-            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 space-y-2">
-              <p className="flex items-center space-x-2">
-                <KeyRound className="w-4 h-4 text-indigo-400" />
-                <span>Two-factor authentication is <span className="text-rose-400 font-semibold">off</span>.</span>
+            <div className="rounded-xl border border-line bg-panel p-4 text-xs text-ink-secondary dark:border-line-dark dark:bg-panel dark:text-ink-secondary-dark space-y-2">
+              <p className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-accent" />
+                <span>
+                  {language === 'es' ? 'La autenticación de dos factores está' : 'Two-factor authentication is'}{' '}
+                  <span className="font-semibold text-danger">{language === 'es' ? 'apagada' : 'off'}</span>.
+                </span>
               </p>
-              <p>When enabled, you&apos;ll be asked for a code from your authenticator app (Google Authenticator, Authy, 1Password, etc.) after signing in.</p>
+              <p>{language === 'es'
+                ? 'Cuando la actives, se te pedirá un código de tu app de autenticación (Google Authenticator, Authy, 1Password, etc.) tras iniciar sesión.'
+                : 'When enabled, you\u2019ll be asked for a code from your authenticator app (Google Authenticator, Authy, 1Password, etc.) after signing in.'}
+              </p>
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm transition disabled:opacity-50"
-            >
-              {loading ? 'Setting up...' : 'Enable Two-Factor Authentication'}
-            </button>
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? t.processing : t.setupTotp}
+            </Button>
           </form>
         )}
 
         {!enabled && setupStep === 'verify' && (
-          <form onSubmit={handleEnable} className="space-y-4">
+          <form onSubmit={handleEnable} className="space-y-4" noValidate>
             {qrUrl && (
               <div className="flex justify-center">
-                <img src={qrUrl} alt="TOTP QR code" className="w-48 h-48 rounded-xl bg-white p-2" />
+                <img src={qrUrl} alt="TOTP QR code" className="h-48 w-48 rounded-xl bg-white p-2" />
               </div>
             )}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Secret Key</label>
-              <input
+              <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.totpSetupHint}</label>
+              <Input
                 readOnly
                 value={secret}
                 onFocus={(e) => e.target.select()}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white font-mono focus:outline-none"
+                className="w-full font-mono"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Enter 6-digit code to confirm</label>
-              <input
+              <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.enterTotpCodeFrom}</label>
+              <Input
                 type="text"
                 required
                 inputMode="numeric"
@@ -163,38 +166,33 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, on
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="• • • • • •"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white font-mono text-center tracking-widest focus:outline-none focus:border-indigo-500"
+                placeholder={t.totpCodePlaceholder}
+                className="w-full text-center font-mono text-lg tracking-[0.5em]"
               />
             </div>
             <div className="flex space-x-2">
-              <button
-                type="button"
-                onClick={() => setSetupStep('idle')}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50"
-              >
-                {loading ? 'Verifying...' : 'Confirm & Enable'}
-              </button>
+              <Button type="button" variant="secondary" onClick={() => setSetupStep('idle')} className="flex-1">
+                {t.cancel}
+              </Button>
+              <Button type="submit" disabled={loading || code.length !== 6} variant="success" className="flex-1">
+                {loading ? t.verifying : t.confirmEnableTotp}
+              </Button>
             </div>
           </form>
         )}
 
         {enabled && (
           <form onSubmit={handleDisable} className="space-y-4">
-            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 flex items-center space-x-2">
-              <QrCode className="w-4 h-4 text-emerald-400" />
-              <span>Two-factor authentication is <span className="text-emerald-400 font-semibold">on</span>.</span>
+            <div className="rounded-xl border border-line bg-panel p-4 text-xs text-ink-secondary dark:border-line-dark dark:bg-panel dark:text-ink-secondary-dark flex items-center gap-2">
+              <QrCode className="h-4 w-4 text-success" />
+              <span>
+                {language === 'es' ? 'La autenticación de dos factores está' : 'Two-factor authentication is'}{' '}
+                <span className="font-semibold text-success">{language === 'es' ? 'activada' : 'on'}</span>.
+              </span>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Enter current code to disable</label>
-              <input
+              <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.enterTotpCodeFrom}</label>
+              <Input
                 type="text"
                 required
                 inputMode="numeric"
@@ -202,20 +200,16 @@ export const TOTPSettingsModal: React.FC<TOTPSettingsModalProps> = ({ isOpen, on
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="• • • • • •"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm text-white font-mono text-center tracking-widest focus:outline-none focus:border-rose-500"
+                placeholder={t.totpCodePlaceholder}
+                className="w-full text-center font-mono text-lg tracking-[0.5em]"
               />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition disabled:opacity-50"
-            >
-              {loading ? 'Disabling...' : 'Disable Two-Factor Authentication'}
-            </button>
+            <Button type="submit" disabled={loading || code.length !== 6} variant="danger" className="w-full">
+              {loading ? t.processing : t.disableTotp}
+            </Button>
           </form>
         )}
       </div>
-    </div>
+    </Modal>
   );
 };

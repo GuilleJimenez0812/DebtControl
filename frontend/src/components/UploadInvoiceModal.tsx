@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import type { Person, PurchaseItem } from '../types';
 import type { ParseInvoiceResult } from '../services/api';
 import type { Language } from '../i18n/translations';
+import { translations } from '../i18n/translations';
 import { generateMonthPeriodOptions } from './NewPurchaseModal';
-import { X, UploadCloud, AlertCircle, PlusCircle, CheckCircle2, User, Tag, FileText, Layers, Eye } from 'lucide-react';
+import { UploadCloud, AlertCircle, PlusCircle, CheckCircle2, User, Tag, FileText, Layers, Eye } from 'lucide-react';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
+import { Select } from './ui/Select';
+import { useToast } from './ui/Toast';
 
 interface UploadInvoiceModalProps {
   isOpen: boolean;
@@ -34,6 +39,8 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
   onOpenPreviewInvoice,
   onCreatePurchase,
 }) => {
+  const t = translations[language];
+  const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [fileBlobUrl, setFileBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -42,6 +49,8 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
   const [selectedPerson, setSelectedPerson] = useState<string>(persons[0]?.name || '');
   const [detailPeriod, setDetailPeriod] = useState<string>('Julio-26');
   const [error, setError] = useState<string>('');
+  const [dragging, setDragging] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -51,18 +60,20 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
       setError('');
       setLoading(false);
       setAttachMode('replace');
+      setDragging(false);
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  const pickFile = (selected: File) => {
+    setFile(selected);
+    setFileBlobUrl(URL.createObjectURL(selected));
+    setError('');
+    setResult(null);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const selected = e.target.files[0];
-      setFile(selected);
-      setFileBlobUrl(URL.createObjectURL(selected));
-      setError('');
-      setResult(null);
+      pickFile(e.target.files[0]);
     }
   };
 
@@ -76,7 +87,7 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
       const res = await onUpload(file);
       setResult(res);
     } catch {
-      setError(language === 'es' ? 'Error al analizar el PDF de la factura.' : 'Failed to parse invoice PDF.');
+      toast('error', language === 'es' ? 'Error al analizar el PDF de la factura.' : 'Failed to parse invoice PDF.');
     } finally {
       setLoading(false);
     }
@@ -89,9 +100,10 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
     try {
       const targetUrl = fileBlobUrl || file.name;
       await onConfirmAttach(item.id, targetUrl, attachMode);
+      toast('success', t.invoiceAttached);
       onClose();
     } catch {
-      setError(language === 'es' ? 'Error al vincular la factura.' : 'Failed to attach invoice.');
+      toast('error', language === 'es' ? 'Error al vincular la factura.' : 'Failed to attach invoice.');
     } finally {
       setLoading(false);
     }
@@ -110,279 +122,220 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
         shipping_cost: result.shipping_cost,
         detail_period: detailPeriod,
       });
+      toast('success', t.invoiceCreated);
       onClose();
     } catch {
-      setError(language === 'es' ? 'Error al crear la orden de compra.' : 'Failed to create purchase order.');
+      toast('error', language === 'es' ? 'Error al crear la orden de compra.' : 'Failed to create purchase order.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="glass-panel w-full max-w-xl p-6 rounded-3xl border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition">
-          <X className="w-5 h-5" />
-        </button>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      width="lg"
+      title={
+        <span className="flex items-center gap-2">
+          <UploadCloud className="h-5 w-5 text-accent" />
+          <span>{t.attachInvoiceTitle}</span>
+        </span>
+      }
+      subtitle={t.attachInvoiceDesc}
+    >
+      {error && (
+        <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-semibold text-danger">{error}</div>
+      )}
 
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="p-3 bg-indigo-600/20 rounded-2xl border border-indigo-500/30 text-indigo-400">
-            <UploadCloud className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-white">
-              {language === 'es' ? 'Vincular Factura PDF a Pedido' : 'Attach PDF Invoice to Order'}
-            </h3>
-            <p className="text-xs text-slate-400">
-              {language === 'es'
-                ? 'Localiza el pedido en el sistema por su número de orden y adjunta la factura PDF'
-                : 'Locates system order by order number and attaches the PDF invoice document'}
+      {!result ? (
+        <form onSubmit={handleUploadSubmit} className="space-y-6">
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              const f = e.dataTransfer.files?.[0];
+              if (f) pickFile(f);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition ${
+              dragging ? 'border-accent bg-accent/10' : 'border-accent/30 bg-accent/5 hover:border-accent/60 hover:bg-accent/10'
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,image/*"
+              onChange={handleFileChange}
+              className="sr-only"
+            />
+            <UploadCloud className="mx-auto mb-3 h-10 w-10 text-accent" />
+            <p className="text-sm font-semibold text-ink dark:text-ink-dark">
+              {file ? file.name : t.dragSelectInvoice}
             </p>
+            <p className="mt-1 text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.amazonReceiptsHint}</p>
           </div>
-        </div>
 
-        {error && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
-            {error}
-          </div>
-        )}
+          {fileBlobUrl && onOpenPreviewInvoice && (
+            <Button type="button" variant="secondary" className="w-full" onClick={() => onOpenPreviewInvoice(fileBlobUrl)}>
+              <Eye className="h-4 w-4 text-accent" />
+              <span>{t.previewSelectedPdf}</span>
+            </Button>
+          )}
 
-        {!result ? (
-          <form onSubmit={handleUploadSubmit} className="space-y-6">
-            <div className="border-2 border-dashed border-slate-700 hover:border-indigo-500/50 rounded-2xl p-8 text-center bg-slate-900/50 transition cursor-pointer relative">
-              <input
-                type="file"
-                accept=".pdf,image/*"
-                onChange={handleFileChange}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-              />
-              <UploadCloud className="w-10 h-10 text-indigo-400 mx-auto mb-3 animate-bounce" />
-              <p className="text-sm font-semibold text-white">
-                {file ? file.name : language === 'es' ? 'Arrastra o selecciona el archivo PDF de la factura' : 'Drag or select your invoice PDF file'}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">Amazon receipts, PDF invoices</p>
+          <Button type="submit" disabled={!file || loading} className="w-full">
+            <span>{loading ? t.analyzingInvoice : t.matchInvoice}</span>
+          </Button>
+        </form>
+      ) : (
+        <div className="space-y-6">
+          {result.matched && result.matched_purchase_item ? (
+            <div className="space-y-5 rounded-2xl border border-success/30 bg-success/5 p-5">
+              <div className="flex items-center justify-between border-b border-success/20 pb-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-success/15 text-success">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h4 className="text-base font-bold text-ink dark:text-ink-dark">{t.matchingOrderFound}</h4>
+                    <p className="text-xs text-success">{t.verifyOrderDetails}</p>
+                  </div>
+                </div>
+
+                {fileBlobUrl && onOpenPreviewInvoice && (
+                  <Button size="sm" variant="secondary" type="button" onClick={() => onOpenPreviewInvoice(fileBlobUrl)}>
+                    <Eye className="h-3.5 w-3.5 text-accent" />
+                    <span>{t.viewPdf}</span>
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-2.5 rounded-xl border border-line bg-black/[0.02] p-4 text-xs dark:border-line-dark dark:bg-white/[0.02]">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1 text-ink-tertiary dark:text-ink-tertiary-dark">
+                    <User className="h-3.5 w-3.5 text-accent" />
+                    <span>{t.personColon}</span>
+                  </span>
+                  <span className="font-bold text-ink dark:text-ink-dark">{result.matched_purchase_item.person_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1 text-ink-tertiary dark:text-ink-tertiary-dark">
+                    <Tag className="h-3.5 w-3.5 text-accent" />
+                    <span>{t.orderNumberColon}</span>
+                  </span>
+                  <span className="font-mono text-ink dark:text-ink-dark font-semibold">{result.matched_purchase_item.order_number}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-tertiary dark:text-ink-tertiary-dark">{t.descriptionColon}</span>
+                  <span className="max-w-[220px] truncate font-medium text-ink dark:text-ink-dark">{result.matched_purchase_item.description}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between border-t border-line pt-2 dark:border-line-dark">
+                  <span className="text-ink-tertiary dark:text-ink-tertiary-dark">{t.currentTotal}</span>
+                  <span className="font-mono text-sm font-extrabold text-ink dark:text-ink-dark">${result.matched_purchase_item.total_cost.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {result.matched_purchase_item.invoice_url ? (
+                <div className="space-y-3 rounded-xl border border-warning/30 bg-warning/5 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-warning">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{t.alreadyAttachedInvoice}</span>
+                    </div>
+                    {onOpenPreviewInvoice && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenPreviewInvoice(result.matched_purchase_item?.invoice_url || '')}
+                        className="flex items-center gap-1 text-xs font-bold text-warning hover:underline"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>{t.preview}</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="truncate rounded-lg bg-black/[0.03] p-2 font-mono text-xs text-ink-secondary dark:bg-white/[0.03] dark:text-ink-secondary-dark" title={result.matched_purchase_item.invoice_url}>
+                    {result.matched_purchase_item.invoice_url.startsWith('blob:')
+                      ? `Factura_${result.matched_purchase_item.order_number || 'Pedido'}.pdf`
+                      : result.matched_purchase_item.invoice_url.split('/').pop()}
+                  </p>
+
+                  <div className="space-y-2 pt-1">
+                    <p className="text-xs font-bold text-ink-secondary dark:text-ink-secondary-dark">{t.handleNewInvoice}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={attachMode === 'replace' ? 'primary' : 'secondary'}
+                        onClick={() => setAttachMode('replace')}
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        <span>{t.replaceExisting}</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={attachMode === 'append' ? 'primary' : 'secondary'}
+                        onClick={() => setAttachMode('append')}
+                      >
+                        <Layers className="h-3.5 w-3.5" />
+                        <span>{t.addAsAdditional}</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex gap-2">
+                <Button variant="ghost" className="w-1/3" onClick={() => setResult(null)}>
+                  {t.cancel}
+                </Button>
+                <Button variant="success" className="w-2/3" onClick={() => handleAcceptMatch(result.matched_purchase_item!)} disabled={loading}>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>{loading ? t.attaching : t.acceptAttachInvoice}</span>
+                </Button>
+              </div>
             </div>
-
-            {fileBlobUrl && onOpenPreviewInvoice && (
-              <button
-                type="button"
-                onClick={() => onOpenPreviewInvoice(fileBlobUrl)}
-                className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-indigo-500/50 text-indigo-300 font-bold text-xs flex items-center justify-center space-x-2 transition"
-              >
-                <Eye className="w-4 h-4 text-indigo-400" />
-                <span>{language === 'es' ? 'Previsualizar PDF Seleccionado' : 'Preview Selected PDF'}</span>
-              </button>
-            )}
-
-            <button
-              type="submit"
-              disabled={!file || loading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-sm font-bold text-white shadow-xl shadow-indigo-600/20 transition flex items-center justify-center space-x-2 disabled:opacity-50"
-            >
-              <span>{loading ? (language === 'es' ? 'Analizando Factura...' : 'Parsing Invoice...') : (language === 'es' ? 'Buscar & Coincidir Factura' : 'Match Invoice')}</span>
-            </button>
-          </form>
-        ) : (
-          <div className="space-y-6">
-            {result.matched && result.matched_purchase_item ? (
-              <div className="glass-card p-6 rounded-2xl border-emerald-500/40 bg-emerald-950/10 space-y-5">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-emerald-500/20 rounded-xl text-emerald-400">
-                      <CheckCircle2 className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="text-base font-bold text-white">
-                        {language === 'es' ? '¡Pedido Encontrado en el Sistema!' : 'Matching Order Found!'}
-                      </h4>
-                      <p className="text-xs text-emerald-300">
-                        {language === 'es' ? 'Verifica los detalles del pedido antes de confirmar la vinculación' : 'Verify order details before confirming attachment'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {fileBlobUrl && onOpenPreviewInvoice && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenPreviewInvoice(fileBlobUrl)}
-                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{language === 'es' ? 'Ver PDF' : 'View PDF'}</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Detailed Order Match Summary */}
-                <div className="space-y-2.5 text-xs bg-slate-950/80 p-4 rounded-xl border border-slate-800">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center space-x-1">
-                      <User className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{language === 'es' ? 'Persona:' : 'Person:'}</span>
-                    </span>
-                    <span className="font-bold text-indigo-300">{result.matched_purchase_item.person_name}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400 flex items-center space-x-1">
-                      <Tag className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{language === 'es' ? 'Número de Orden:' : 'Order Number:'}</span>
-                    </span>
-                    <span className="font-mono text-white font-semibold">{result.matched_purchase_item.order_number}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">{language === 'es' ? 'Descripción:' : 'Description:'}</span>
-                    <span className="text-slate-200 font-medium truncate max-w-[220px]">{result.matched_purchase_item.description}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-slate-800 pt-2 mt-2">
-                    <span className="text-slate-400">{language === 'es' ? 'Monto Total Actual del Pedido:' : 'Current Total:'}</span>
-                    <span className="text-sm font-extrabold text-white font-mono">${result.matched_purchase_item.total_cost.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Check if invoice already attached */}
-                {result.matched_purchase_item.invoice_url ? (
-                  <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2 text-amber-400 text-xs font-semibold">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>
-                          {language === 'es' ? 'Esta orden ya tiene factura adjunta:' : 'This order already has an attached invoice:'}
-                        </span>
-                      </div>
-                      {onOpenPreviewInvoice && (
-                        <button
-                          type="button"
-                          onClick={() => onOpenPreviewInvoice(result.matched_purchase_item?.invoice_url || '')}
-                          className="flex items-center space-x-1 text-xs text-amber-300 hover:underline font-bold"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>{language === 'es' ? 'Ver Previa' : 'Preview'}</span>
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs font-mono text-slate-300 truncate bg-slate-900 p-2 rounded-lg" title={result.matched_purchase_item.invoice_url}>
-                      {result.matched_purchase_item.invoice_url.startsWith('blob:')
-                        ? `Factura_${result.matched_purchase_item.order_number || 'Pedido'}.pdf`
-                        : result.matched_purchase_item.invoice_url.split('/').pop()}
-                    </p>
-
-                    <div className="space-y-2 pt-1">
-                      <p className="text-xs font-bold text-slate-200">
-                        {language === 'es' ? '¿Cómo deseas manejar la nueva factura?' : 'How would you like to handle the new invoice?'}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setAttachMode('replace')}
-                          className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
-                            attachMode === 'replace'
-                              ? 'bg-amber-600 border-amber-500 text-white shadow-lg'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>{language === 'es' ? 'Reemplazar Existente' : 'Replace Existing'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setAttachMode('append')}
-                          className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center space-x-1.5 ${
-                            attachMode === 'append'
-                              ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          <Layers className="w-3.5 h-3.5" />
-                          <span>{language === 'es' ? 'Añadir Extra' : 'Add as Additional'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Confirm Action Button */}
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => setResult(null)}
-                    className="w-1/3 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
-                  >
-                    {language === 'es' ? 'Cancelar' : 'Cancel'}
-                  </button>
-
-                  <button
-                    onClick={() => handleAcceptMatch(result.matched_purchase_item!)}
-                    disabled={loading}
-                    className="w-2/3 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xl shadow-emerald-600/20 transition flex items-center justify-center space-x-2"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>{loading ? 'Attaching...' : (language === 'es' ? 'Aceptar & Adjuntar Factura' : 'Accept & Attach Invoice')}</span>
-                  </button>
-                </div>
+          ) : (
+            <div className="space-y-4 rounded-2xl border border-warning/30 bg-warning/5 p-5">
+              <div className="flex items-center gap-2 text-warning">
+                <AlertCircle className="h-5 w-5" />
+                <h4 className="text-sm font-bold text-ink dark:text-ink-dark">{t.noMatchingOrder}</h4>
               </div>
-            ) : (
-              <div className="glass-card p-6 rounded-2xl border-amber-500/30 space-y-4">
-                <div className="flex items-center space-x-2 text-amber-400">
-                  <AlertCircle className="w-5 h-5" />
-                  <h4 className="text-sm font-bold">
-                    {language === 'es' ? 'No se encontró un pedido existente para este número de orden' : 'No existing order matches this invoice'}
-                  </h4>
-                </div>
 
-                <div className="space-y-2 text-xs bg-slate-950/60 p-3 rounded-xl font-mono">
-                  <p><span className="text-slate-400">Order #:</span> <span className="text-white">{result.order_number || 'N/A'}</span></p>
-                  <p><span className="text-slate-400">Amount in Invoice:</span> <span className="text-white">${result.total_cost.toFixed(2)}</span></p>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="block text-xs font-semibold text-slate-300">
-                    {language === 'es' ? 'Asignar a Persona:' : 'Assign to Person:'}
-                  </label>
-                  <select
-                    value={selectedPerson}
-                    onChange={(e) => setSelectedPerson(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white font-semibold"
-                  >
-                    {persons.map((p) => (
-                      <option key={p.id} value={p.name}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="block text-xs font-semibold text-slate-300">Detail Period:</label>
-                  <select
-                    value={detailPeriod}
-                    onChange={(e) => setDetailPeriod(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-white font-semibold cursor-pointer"
-                  >
-                    {generateMonthPeriodOptions().map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                    <option value="N/A">N/A</option>
-                  </select>
-                </div>
-
-                <button
-                  onClick={handleCreateUnmatchedPurchase}
-                  disabled={loading}
-                  className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center space-x-2"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>{loading ? 'Creating...' : (language === 'es' ? 'Crear Nuevo Pedido con esta Factura' : 'Create New Order with Invoice')}</span>
-                </button>
+              <div className="rounded-xl border border-line bg-black/[0.02] p-3 font-mono text-xs dark:border-line-dark dark:bg-white/[0.02]">
+                <p><span className="text-ink-tertiary dark:text-ink-tertiary-dark">{t.orderNumberColon}</span> <span className="text-ink dark:text-ink-dark font-semibold">{result.order_number || 'N/A'}</span></p>
+                <p><span className="text-ink-tertiary dark:text-ink-tertiary-dark">{t.amountInInvoice}</span> <span className="font-semibold text-ink dark:text-ink-dark">${result.total_cost.toFixed(2)}</span></p>
               </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.assignToPerson}</label>
+                <Select
+                  value={selectedPerson}
+                  onValueChange={setSelectedPerson}
+                  options={persons.map((p) => ({ value: p.name, label: p.name }))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.detailPeriod}</label>
+                <Select
+                  value={detailPeriod}
+                  onValueChange={setDetailPeriod}
+                  options={[...generateMonthPeriodOptions().map((opt) => ({ value: opt, label: opt })), { value: 'N/A', label: 'N/A' }]}
+                  className="w-full"
+                />
+              </div>
+
+              <Button onClick={handleCreateUnmatchedPurchase} disabled={loading} className="w-full">
+                <PlusCircle className="h-4 w-4" />
+                <span>{loading ? t.creatingOrder : t.createNewOrderWithInvoice}</span>
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 };

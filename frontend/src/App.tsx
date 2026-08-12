@@ -4,10 +4,12 @@ import { apiService } from './services/api';
 import type { User, Person, PurchaseItem, LoginResult } from './types';
 import type { Language } from './i18n/translations';
 import { translations } from './i18n/translations';
-import { Navbar } from './components/Navbar';
+import { TitleBar } from './components/layout/TitleBar';
+import { Sidebar, type NavKey } from './components/layout/Sidebar';
 import { SummaryCards } from './components/SummaryCards';
 import { DebtTable } from './components/DebtTable';
 import { PurchasesList } from './components/PurchasesList';
+import { ShippingPackages } from './components/ShippingPackages';
 import { PurchaseDetailModal } from './components/PurchaseDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { TOTPSettingsModal } from './components/TOTPSettingsModal';
@@ -21,7 +23,7 @@ import { AuditLogsModal } from './components/AuditLogsModal';
 import { UploadInvoiceModal } from './components/UploadInvoiceModal';
 import { InvoicePreviewModal } from './components/InvoicePreviewModal';
 import { SearchBar } from './components/SearchBar';
-import { Layers, ShoppingBag } from 'lucide-react';
+import { Layers, ShoppingBag, X } from 'lucide-react';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,14 +42,34 @@ const DashboardContent: React.FC = () => {
     const savedLang = localStorage.getItem('debtcontrol_lang');
     return (savedLang === 'en' || savedLang === 'es') ? savedLang : 'es';
   });
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('debtcontrol_dark');
+    return saved === null ? false : saved === 'true';
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+    localStorage.setItem('debtcontrol_dark', String(isDarkMode));
+  }, [isDarkMode]);
 
   const handleLanguageChange = (newLang: Language) => {
     setLanguage(newLang);
     localStorage.setItem('debtcontrol_lang', newLang);
   };
 
+  const handleSidebarNavigate = (key: NavKey) => {
+    if (key === 'debts' || key === 'purchases') {
+      setActiveTab(key);
+    } else if (key === 'payments') {
+      setActiveTab('debts');
+      document.getElementById('debt-actions')?.scrollIntoView({ behavior: 'smooth' });
+    } else if (key === 'invoices') {
+      setIsUploadInvoiceOpen(true);
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<'debts' | 'purchases'>('debts');
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>('All');
   const [selectedPeriodFilter, setSelectedPeriodFilter] = useState<string>('All');
 
@@ -224,7 +246,7 @@ const DashboardContent: React.FC = () => {
 
   return (
     <div className={`min-h-screen transition-colors duration-200 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      <Navbar
+      <TitleBar
         user={user}
         language={language}
         onLanguageChange={handleLanguageChange}
@@ -237,88 +259,141 @@ const DashboardContent: React.FC = () => {
         onOpenSecurityModal={() => setIsSecurityOpen(true)}
         onOpenChangePasswordModal={() => setIsChangePasswordOpen(true)}
         onLogout={handleLogout}
+        onOpenMenu={() => setDrawerOpen(true)}
         onSeedData={() => seedMutation.mutate()}
         isSeeding={seedMutation.isPending}
       />
 
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {!user ? (
-          <AuthWall language={language} onOpenAuthModal={() => setIsAuthOpen(true)} />
-        ) : (
-          <>
-            <SummaryCards
-              persons={summary?.persons || []}
-              totalOutstanding={summary?.total_outstanding || 0}
-              language={language}
-              selectedPersonFilter={selectedPersonFilter}
-              onSelectPersonFilter={handleSelectPersonFromSummary}
-            />
+      <div className="flex max-w-[2000px] w-full mx-auto">
+        <aside className="sticky top-11 hidden lg:block h-[calc(100vh-44px)] w-56 shrink-0 mac-vibrancy mac-vibrancy-light dark:mac-vibrancy border-r border-line dark:border-line-dark">
+          <Sidebar
+            active={activeTab as NavKey}
+            onNavigate={handleSidebarNavigate}
+            isAdmin={user?.role === 'admin'}
+            onOpenAdminModal={() => setIsAdminOpen(true)}
+            onOpenAuditLogsModal={() => setIsAuditLogsOpen(true)}
+            onOpenUploadInvoiceModal={() => setIsUploadInvoiceOpen(true)}
+          />
+        </aside>
 
-            <SearchBar language={language} onSelectResult={handleSearchResultSelect} />
+        <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {!user ? (
+            <AuthWall language={language} onOpenAuthModal={() => setIsAuthOpen(true)} />
+          ) : (
+            <>
+              <SummaryCards
+                persons={summary?.persons || []}
+                totalOutstanding={summary?.total_outstanding || 0}
+                language={language}
+                selectedPersonFilter={selectedPersonFilter}
+                onSelectPersonFilter={handleSelectPersonFromSummary}
+              />
 
-            {/* View Tabs */}
-            <div className="flex space-x-2 border-b border-slate-800/80 mb-6 pb-2 mt-2">
+              <SearchBar language={language} onSelectResult={handleSearchResultSelect} />
+              <div className="flex space-x-2 border-b border-line dark:border-line-dark mb-6 pb-2 mt-2">
+                <button
+                  onClick={() => setActiveTab('debts')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition ${
+                    activeTab === 'debts'
+                      ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                      : 'text-ink-muted hover:text-ink hover:bg-black/5 dark:text-ink-muted-dark dark:hover:text-ink-dark dark:hover:bg-white/10'
+                  }`}
+                >
+                  <Layers className="w-4 h-4" />
+                  <span>{t.debtsTab}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('purchases')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition ${
+                    activeTab === 'purchases'
+                      ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                      : 'text-ink-muted hover:text-ink hover:bg-black/5 dark:text-ink-muted-dark dark:hover:text-ink-dark dark:hover:bg-white/10'
+                  }`}
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>{t.purchasesTab}</span>
+                </button>
+              </div>
+
+              {isLoading ? (
+                <div className="glass-panel p-12 rounded-3xl text-center text-slate-400 animate-pulse">
+                  Loading DebtControl platform data...
+                </div>
+              ) : (
+                <>
+                  {activeTab === 'debts' && (
+                    <DebtTable
+                      persons={summary?.persons || []}
+                      language={language}
+                      userRole={user?.role}
+                      onOpenPaymentModal={(person) => setSelectedPersonForPayment(person)}
+                      onOpenPurchaseModal={() => setIsPurchaseOpen(true)}
+                      onSelectPersonFilter={handleSelectPersonFromSummary}
+                    />
+                  )}
+
+                  {activeTab === 'purchases' && (
+                    <>
+                      <PurchasesList
+                        purchases={summary?.recent_purchases || []}
+                        language={language}
+                        selectedPersonFilter={selectedPersonFilter}
+                        onPersonFilterChange={setSelectedPersonFilter}
+                        selectedPeriodFilter={selectedPeriodFilter}
+                        onPeriodFilterChange={setSelectedPeriodFilter}
+                        onSelectPurchase={(item) => setSelectedPurchaseForModal(item)}
+                      />
+<ShippingPackages packages={summary?.shipping_packages || []} language={language} />
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          )}
+      </main>
+
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
+          <aside className="absolute left-0 top-0 h-full w-72 mac-vibrancy mac-vibrancy-light dark:mac-vibrancy border-r border-line dark:border-line-dark shadow-2xl">
+            <div className="flex h-11 items-center justify-between border-b border-line dark:border-line-dark px-4">
+              <span className="text-[13px] font-semibold text-ink dark:text-ink-dark">DebtControl</span>
               <button
-                onClick={() => setActiveTab('debts')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition ${
-                  activeTab === 'debts'
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                }`}
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Close menu"
+                className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-muted hover:bg-black/5 dark:text-ink-muted-dark dark:hover:bg-white/10"
               >
-                <Layers className="w-4 h-4" />
-                <span>{t.debtsTab}</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('purchases')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition ${
-                  activeTab === 'purchases'
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                }`}
-              >
-                <ShoppingBag className="w-4 h-4" />
-                <span>{t.purchasesTab}</span>
+                <X className="h-4 w-4" />
               </button>
             </div>
-
-            {isLoading ? (
-              <div className="glass-panel p-12 rounded-3xl text-center text-slate-400 animate-pulse">
-                Loading DebtControl platform data...
-              </div>
-            ) : (
-              <>
-                {activeTab === 'debts' && (
-                  <DebtTable
-                    persons={summary?.persons || []}
-                    language={language}
-                    userRole={user?.role}
-                    onOpenPaymentModal={(person) => setSelectedPersonForPayment(person)}
-                    onOpenPurchaseModal={() => setIsPurchaseOpen(true)}
-                    onSelectPersonFilter={handleSelectPersonFromSummary}
-                  />
-                )}
-
-                {activeTab === 'purchases' && (
-                  <PurchasesList
-                    purchases={summary?.recent_purchases || []}
-                    language={language}
-                    selectedPersonFilter={selectedPersonFilter}
-                    onPersonFilterChange={setSelectedPersonFilter}
-                    selectedPeriodFilter={selectedPeriodFilter}
-                    onPeriodFilterChange={setSelectedPeriodFilter}
-                    onSelectPurchase={(item) => setSelectedPurchaseForModal(item)}
-                  />
-                )}
-              </>
-            )}
-          </>
-        )}
-      </main>
+            <Sidebar
+              active={activeTab as NavKey}
+              onNavigate={(key) => {
+                handleSidebarNavigate(key);
+                setDrawerOpen(false);
+              }}
+              isAdmin={user?.role === 'admin'}
+              onOpenAdminModal={() => {
+                setIsAdminOpen(true);
+                setDrawerOpen(false);
+              }}
+              onOpenAuditLogsModal={() => {
+                setIsAuditLogsOpen(true);
+                setDrawerOpen(false);
+              }}
+              onOpenUploadInvoiceModal={() => {
+                setIsUploadInvoiceOpen(true);
+                setDrawerOpen(false);
+              }}
+            />
+          </aside>
+        </div>
+      )}
 
       <AuthModal
         isOpen={isAuthOpen}
+        language={language}
         onClose={() => setIsAuthOpen(false)}
         onLogin={handleLogin}
         onCompleteMFA={handleCompleteMFA}
@@ -332,16 +407,19 @@ const DashboardContent: React.FC = () => {
 
       <ForgotPasswordModal
         isOpen={isForgotPasswordOpen}
+        language={language}
         onClose={() => setIsForgotPasswordOpen(false)}
       />
 
       <TOTPSettingsModal
         isOpen={isSecurityOpen}
+        language={language}
         onClose={() => setIsSecurityOpen(false)}
       />
 
       <ChangePasswordModal
         isOpen={isChangePasswordOpen}
+        language={language}
         onClose={() => setIsChangePasswordOpen(false)}
       />
 
@@ -349,6 +427,7 @@ const DashboardContent: React.FC = () => {
         isOpen={isAdminOpen}
         usersWithPersons={adminUsers || []}
         allPersons={summary?.persons || []}
+        language={language}
         onClose={() => setIsAdminOpen(false)}
         onCreateUser={async (payload) => {
           await createAdminUserMutation.mutateAsync(payload);
@@ -399,11 +478,16 @@ const DashboardContent: React.FC = () => {
         onSubmit={async (payload) => {
           await purchaseMutation.mutateAsync(payload);
         }}
+        onAfterSave={(personName) => {
+          const person = (summary?.persons || []).find((p) => p.name === personName);
+          if (person) setSelectedPersonForPayment(person);
+        }}
       />
 
       <NewPaymentModal
         person={selectedPersonForPayment}
         isOpen={!!selectedPersonForPayment}
+        language={language}
         onClose={() => setSelectedPersonForPayment(null)}
         onSubmit={async (payload) => {
           await paymentMutation.mutateAsync(payload);
@@ -436,6 +520,7 @@ const DashboardContent: React.FC = () => {
           await deletePurchaseMutation.mutateAsync(purchaseId);
         }}
       />
+      </div>
     </div>
   );
 };

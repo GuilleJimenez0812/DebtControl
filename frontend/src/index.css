@@ -1,50 +1,105 @@
 @import "tailwindcss";
 
-/*
+/* 
  * Responsive breakpoint & layout policy — see docs/adr/0002.
  * Tiers: base(0) sm(640) md(768) lg(1024) xl(1280) 2xl(1536) | 3xl(1600) 4xl(2000).
- * md is the table->card boundary. Container widens on ultra-wide:
- * xl max-w-7xl, 3xl max-w-[90rem], 4xl max-w-[110rem].
- * Touch: rows/buttons h-12 min; card p-4 sm:p-6; gap-3 sm:gap-4.
+ * md is the table->card boundary. Container widens on ultra-wide.
+ * Apple/macOS design system — see docs/adr/0009 (ADR-0009).
  */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Typography — ADR-0009 Q2 */
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+
+  /* Light palette — ADR-0009 Q1 (Variant A) */
+  --color-canvas: #fafafa;
+  --color-panel: #ffffff;
+  --color-sidebar: #ececf0;
+  --color-titlebar: #e8e8ed;
+  --color-accent: #0071e3;
+  --color-accent-glow: #bf5af2;
+  --color-success: #34c759;
+  --color-warning: #ff9f0a;
+  --color-danger: #ff453a;
+  --color-radix: #0a84ff;
+  --color-ink: #1d1d1f;
+  --color-ink-secondary: #484950;
+  --color-ink-muted: #86868b;
+  --color-ink-tertiary: #a1a1a6;
+  --color-line: rgba(0, 0, 0, 0.1);
+  --color-line-strong: rgba(0, 0, 0, 0.16);
+  --color-accent-hover: #0077ed;
+
+  /* Dark palette — ADR-0009 Q1 */
+  --color-canvas-dark: #1d1d1f;
+  --color-panel-dark: #2c2c2e;
+  --color-sidebar-dark: #1d1d1f;
+  --color-titlebar-dark: #2c2c2e;
+  --color-accent-dark: #409cff;
+  --color-accent-glow-dark: #bf5af2;
+  --color-success-dark: #30d158;
+  --color-warning-dark: #ffd60a;
+  --color-danger-dark: #ff453a;
+  --color-ink-dark: #f5f5f7;
+  --color-ink-secondary-dark: #a1a1a6;
+  --color-ink-muted-dark: #6e6e73;
+  --color-ink-tertiary-dark: #484950;
+  --color-line-dark: rgba(255, 255, 255, 0.1);
+  --color-line-strong-dark: rgba(255, 255, 255, 0.16);
+  --color-accent-hover-dark: #409cff;
+
+  /* macOS radii & elevation — ADR-0009 */
+  --radius-panel: 12px;
+  --radius-control: 8px;
+  --shadow-panel: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-panel-dark: 0 2px 12px rgba(0, 0, 0, 0.4);
+  --shadow-apple: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --shadow-apple-dark: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
 
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 font-sans antialiased min-h-screen selection:bg-indigo-500 selection:text-white;
-    background-image: 
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.15) 0px, transparent 50%);
+    @apply bg-canvas text-ink font-sans antialiased min-h-screen selection:bg-accent selection:text-white;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  .dark body {
+    @apply bg-canvas-dark text-ink-dark;
+  }
+
+  /* macOS vibrancy helpers — ADR-0009 (blur + saturate, research docs/research/macos_web_effects.md) */
+  .mac-vibrancy {
+    backdrop-filter: blur(18px) saturate(1.8);
+    -webkit-backdrop-filter: blur(18px) saturate(1.8);
+  }
+
+  .mac-vibrancy-light {
+    background: rgba(238, 238, 242, 0.72);
+  }
+
+  .dark .mac-vibrancy {
+    background: rgba(44, 44, 46, 0.72);
+  }
+
+  .dark .mac-vibrancy-light {
+    background: rgba(44, 44, 46, 0.72);
   }
 }
 
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-card {
-  background: rgba(30, 41, 59, 0.6);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  transition: all 0.2s ease-in-out;
-}
-
-.glass-card:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  transform: translateY(-2px);
-}
-
-/* Print stylesheet — prints the dashboard (summary + tables/cards) in monochrome.
- * The invoice preview is a real PDF and prints natively, so it is out of scope here. */
+/* Print stylesheet — prints dashboard (summary + tables/cards) in monochrome,
+ * re-tokenized for the new palette (ADR-0009 Q6). Invoice preview is a real
+ * PDF and prints natively, out of scope. */
 @media print {
   @page {
     margin: 12mm;
     size: A4;
   }
 
-  body {
+  body,
+  .dark body {
     background: #fff !important;
     background-image: none !important;
     color: #111 !important;
@@ -70,7 +125,12 @@
 
   /* Flatten panels + cards to readable monochrome */
   .glass-panel,
-  .glass-card {
+  .glass-card,
+  .mac-vibrancy,
+  .bg-canvas,
+  .bg-canvas-dark,
+  .bg-panel,
+  .bg-panel-dark {
     background: #fff !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
@@ -81,7 +141,8 @@
   }
 
   .glass-panel *,
-  .glass-card * {
+  .glass-card *,
+  .mac-vibrancy * {
     color: #111 !important;
   }
 
@@ -117,8 +178,10 @@
     break-inside: avoid;
   }
 
-  /* Hero number + person cards */
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     color: #111 !important;
   }
   .font-mono {

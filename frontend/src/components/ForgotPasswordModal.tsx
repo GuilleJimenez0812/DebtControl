@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
-import { X, Mail, KeyRound, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Mail, KeyRound, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { apiService } from '../services/api';
+import type { Language } from '../i18n/translations';
+import { translations } from '../i18n/translations';
+import { Modal } from './ui/Modal';
+import { Input } from './ui/Input';
+import { Button } from './ui/Button';
 
 interface ForgotPasswordModalProps {
   isOpen: boolean;
+  language: Language;
   onClose: () => void;
 }
 
 type Step = 'email' | 'otp' | 'new-password';
 
-export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, onClose }) => {
+export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen, language, onClose }) => {
+  const t = translations[language];
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState<string>('');
   const [code, setCode] = useState<string>('');
@@ -20,8 +27,6 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
   const [error, setError] = useState<string>('');
   const [message, setMessage] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-
-  if (!isOpen) return null;
 
   const reset = () => {
     setStep('email');
@@ -46,10 +51,10 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
     setError('');
     try {
       await apiService.requestPasswordReset(email);
-      setMessage('If that email is registered, a reset code was sent. Check your inbox.');
+      setMessage(t.resetCodeSent);
       setStep('otp');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to request a reset code.');
+      setError(err instanceof Error ? err.message : t.invalidResetCode);
     } finally {
       setLoading(false);
     }
@@ -64,7 +69,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
       setResetTicket(result.reset_ticket);
       setStep('new-password');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Invalid code. Please try again.');
+      setError(err instanceof Error ? err.message : t.invalidResetCode);
     } finally {
       setLoading(false);
     }
@@ -74,90 +79,70 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
     e.preventDefault();
     setError('');
     if (newPassword.length < 12) {
-      setError('The new password must be at least 12 characters long.');
+      setError(t.passwordMin12);
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('The new password and its confirmation do not match.');
+      setError(t.passwordMismatch);
       return;
     }
 
     setLoading(true);
     try {
       await apiService.resetPassword(resetTicket, newPassword);
-      setMessage('Password reset successfully. You can now sign in.');
+      setMessage(t.passwordResetSuccess);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to reset the password.');
+      setError(err instanceof Error ? err.message : t.passwordChangeFailed);
     } finally {
       setLoading(false);
     }
   };
 
-  const baseInput =
-    'w-full bg-slate-900 border border-slate-700 rounded-xl py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition';
-  const passwordInput =
-    'w-full bg-slate-900 border border-slate-700 rounded-xl py-2 pl-9 pr-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition';
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="glass-panel w-full max-w-md p-6 rounded-2xl border border-slate-700 shadow-2xl relative">
-        <button onClick={handleClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
-          <X className="w-5 h-5" />
-        </button>
-
-        <h3 className="text-xl font-bold text-white mb-1 flex items-center space-x-2">
-          <KeyRound className="w-5 h-5 text-indigo-400" />
-          <span>Forgot Password</span>
-        </h3>
-        <p className="text-xs text-slate-400 mb-5">
-          {step === 'email' && 'Enter your account email to receive a reset code'}
-          {step === 'otp' && 'We sent you a 6-digit code. Enter it below'}
-          {step === 'new-password' && 'Choose a new password (min. 12 characters)'}
-        </p>
+    <Modal open={isOpen} onClose={handleClose} width="sm">
+      <div className="relative -m-6 overflow-hidden rounded-[14px] p-8">
+        <div className="mb-4 flex items-center gap-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-accent/10 text-accent dark:bg-accent/20">
+            <KeyRound className="h-5 w-5" />
+          </span>
+          <div>
+            <h3 className="text-xl font-bold text-ink dark:text-ink-dark">{t.forgotPasswordTitle}</h3>
+            <p className="text-xs text-ink-secondary dark:text-ink-secondary-dark">
+              {step === 'email' && t.forgotPasswordEmailStep}
+              {step === 'otp' && t.forgotPasswordOtpStep}
+              {step === 'new-password' && t.forgotPasswordNewStep}
+            </p>
+          </div>
+        </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold">
-            {error}
-          </div>
+          <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 p-3 text-xs font-semibold text-danger">{error}</div>
         )}
         {message && (
-          <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-            {message}
-          </div>
+          <div className="mb-4 rounded-xl border border-success/30 bg-success/10 p-3 text-xs font-semibold text-success">{message}</div>
         )}
 
         {step === 'email' && (
-          <form onSubmit={handleRequest} className="space-y-4">
+          <form onSubmit={handleRequest} className="space-y-4" noValidate>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@example.com"
-                className={baseInput}
-              />
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted dark:text-ink-muted-dark" />
+              <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" className="w-full pl-9" />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition disabled:opacity-50"
-            >
-              {loading ? 'Sending...' : 'Send Reset Code'}
-            </button>
+            <Button type="submit" disabled={loading || !email} className="w-full">
+              {loading ? t.sending : t.sendResetCode}
+            </Button>
           </form>
         )}
 
         {step === 'otp' && (
-          <form onSubmit={handleVerify} className="space-y-4">
+          <form onSubmit={handleVerify} className="space-y-4" noValidate>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-              <input type="email" value={email} readOnly className={baseInput} />
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted dark:text-ink-muted-dark" />
+              <Input type="email" value={email} readOnly className="w-full pl-9 opacity-70" />
             </div>
             <div className="relative">
-              <ShieldCheck className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-              <input
+              <ShieldCheck className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted dark:text-ink-muted-dark" />
+              <Input
                 type="text"
                 required
                 inputMode="numeric"
@@ -166,69 +151,62 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({ isOpen
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                 placeholder="• • • • • •"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition tracking-widest text-center"
+                className="w-full pl-9 text-center font-mono text-lg tracking-[0.5em]"
               />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition disabled:opacity-50"
-            >
-              {loading ? 'Verifying...' : 'Verify Code'}
-            </button>
+            <Button type="submit" disabled={loading || code.length !== 6} className="w-full">
+              {loading ? t.verifying : t.verifyCode}
+            </Button>
             <button
               type="button"
               onClick={() => setStep('email')}
-              className="w-full text-center text-xs text-slate-400 hover:text-slate-200 transition"
+              className="w-full text-center text-xs font-medium text-ink-muted transition hover:text-ink dark:text-ink-muted-dark dark:hover:text-ink-dark"
             >
-              Resend code / change email
+              {t.resendCodeOrChangeEmail}
             </button>
           </form>
         )}
 
         {step === 'new-password' && (
-          <form onSubmit={handleReset} className="space-y-4">
+          <form onSubmit={handleReset} className="space-y-4" noValidate>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-              <input
+              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted dark:text-ink-muted-dark" />
+              <Input
                 type={showPassword ? 'text' : 'password'}
                 required
                 minLength={12}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="New password"
-                className={passwordInput}
+                placeholder={t.newPassword}
+                className="w-full pl-9 pr-10"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                aria-label={showPassword ? t.hidePassword : t.showPassword}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-ink-muted transition hover:text-ink dark:text-ink-muted-dark dark:hover:text-ink-dark"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-              <input
+              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted dark:text-ink-muted-dark" />
+              <Input
                 type={showPassword ? 'text' : 'password'}
                 required
                 minLength={12}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                className={baseInput}
+                placeholder={t.confirmNewPassword}
+                className="w-full pl-9"
               />
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition disabled:opacity-50"
-            >
-              {loading ? 'Saving...' : 'Reset Password'}
-            </button>
+            <Button type="submit" disabled={loading || newPassword.length < 12 || newPassword !== confirmPassword} className="w-full">
+              {loading ? t.saving : t.resetPassword}
+            </Button>
           </form>
         )}
       </div>
-    </div>
+    </Modal>
   );
 };
