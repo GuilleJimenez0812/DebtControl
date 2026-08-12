@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { PurchaseItem, ShippingPackage } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
-import { ShoppingBag, Tag, ArrowRight, FileText, Truck } from 'lucide-react';
+import { ShoppingBag, Tag, ArrowRight, FileText, Truck, HelpCircle } from 'lucide-react';
 import { Select, type SelectOption } from './ui/Select';
 import { Badge } from './ui/Badge';
 
@@ -111,8 +111,16 @@ export const PurchasesList: React.FC<PurchasesListProps> = ({
                   <th className="py-3 px-2">{language === 'es' ? 'Alertas' : 'Alerts'}</th>
                   <th className="py-3 px-2">{language === 'es' ? 'Almacén' : 'Warehouse'}</th>
                   <th className="py-3 px-2">{language === 'es' ? 'Personal' : 'Personal'}</th>
-                  <th className="py-3 px-2">{t.itemAmount}</th>
-                  <th className="py-3 px-2">{t.taxAmount}</th>
+                  <th className="py-3 px-2">
+                    <div className="flex items-center gap-1" title={language === 'es' ? 'Valor total pagado de la orden' : 'Total value paid for the order'}>
+                      {t.itemAmount} <HelpCircle className="h-3 w-3" />
+                    </div>
+                  </th>
+                  <th className="py-3 px-2">
+                    <div className="flex items-center gap-1" title={language === 'es' ? 'El impuesto se resta ya que se solicita después el reembolso' : 'Tax is subtracted as refund is requested later'}>
+                      {t.taxAmount} <HelpCircle className="h-3 w-3" />
+                    </div>
+                  </th>
                   <th className="py-3 px-2">{t.shippingCost}</th>
                   <th className="py-3 px-2">{t.totalCost}</th>
                   <th className="py-3 px-2">{language === 'es' ? 'Período' : 'Period'}</th>

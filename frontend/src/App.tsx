@@ -504,6 +504,18 @@ const DashboardContent: React.FC = () => {
         userRole={user?.role}
         onClose={() => setSelectedPurchaseForModal(null)}
         onOpenPreviewInvoice={(url) => setPreviewInvoiceUrl(url)}
+        onUploadInvoice={apiService.uploadInvoice}
+        onConfirmAttachInvoice={async (purchaseId, invoiceFilename, mode) => {
+          await confirmAttachInvoiceMutation.mutateAsync({ purchaseId, invoiceFilename, mode });
+          // Optionally, refetch the purchase inside the modal, but the mutation invalidates dashboardSummary
+          // We can let the background update it, or update it optimistically.
+          const url = invoiceFilename.startsWith('blob:') ? invoiceFilename : `/uploads/invoices/${invoiceFilename}`;
+          setSelectedPurchaseForModal((prev) => {
+            if (!prev) return null;
+            const newUrl = mode === 'append' && prev.invoice_url ? `${prev.invoice_url},${url}` : url;
+            return { ...prev, invoice_url: newUrl };
+          });
+        }}
         onUpdatePurchase={async (id, payload) => {
           await updatePurchaseMutation.mutateAsync({ id, payload });
           setSelectedPurchaseForModal((prev) => (prev ? { ...prev, ...payload, total_cost: payload.item_amount + payload.tax_amount + payload.shipping_cost } : null));
