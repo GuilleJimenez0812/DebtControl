@@ -4,12 +4,28 @@ import (
 	"time"
 
 	"debtcontrol/backend/internal/core/ports"
+	"debtcontrol/backend/pkg/ratelimit"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase, allowedOrigins []string) *gin.Engine {
+// SecurityOptions wires the anti-bruteforce guards into the router.
+type SecurityOptions struct {
+	RateLimiter      *ratelimit.Limiter
+	LoginPolicies    []ratelimit.Policy // per IP+account
+	RegisterPolicies []ratelimit.Policy // per IP
+	GlobalPolicies   []ratelimit.Policy // per IP, every /api/v1 request
+	// ResetRequestPolicies throttle "forgot password" POSTs to prevent OTP
+	// mailbox flooding (per IP).
+	ResetRequestPolicies []ratelimit.Policy
+	// ResetVerifyPolicies throttle OTP+ticket verification to stop code guessing
+	// (per IP).
+	ResetVerifyPolicies []ratelimit.Policy
+	TurnstileSecret     string
+}
+
+func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase, allowedOrigins []string, registrationEnabled bool, security SecurityOptions) *gin.Engine {
 	routerEngine := gin.Default()
 
 	routerEngine.Use(SecurityHeadersMiddleware())
@@ -23,22 +39,65 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 		MaxAge:           12 * time.Hour,
 	}))
 
-	authHandler := NewAuthHandler(authUseCase)
+	authHandler := NewAuthHandler(authUseCase, registrationEnabled)
 	debtHandler := NewDebtHandler(debtUseCase)
 	adminHandler := NewAdminHandler(adminUseCase)
 
 	apiGroup := routerEngine.Group("/api/v1")
+	if security.RateLimiter != nil && len(security.GlobalPolicies) > 0 {
+		apiGroup.Use(RateLimitMiddleware(security.RateLimiter, "api", security.GlobalPolicies, nil))
+	}
 	{
 		authGroup := apiGroup.Group("/auth")
 		{
-			authGroup.POST("/register", authHandler.Register)
-			authGroup.POST("/login", authHandler.Login)
-			authGroup.POST("/logout", authHandler.Logout)
-			authGroup.GET("/me", AuthMiddleware(authUseCase), authHandler.GetCurrentUser)
+			authGroup.GET("/registration-status", authHandler.RegistrationStatus)
+			if registrationEnabled {
+				authGroup.POST("/register",
+					CSRFMiddleware(true),
+					RateLimitMiddleware(security.RateLimiter, "register", security.RegisterPolicies, nil),
+					TurnstileMiddleware(security.TurnstileSecret),
+					authHandler.Register)
+			}
+			authGroup.POST("/login",
+				CSRFMiddleware(true),
+				RateLimitMiddleware(security.RateLimiter, "login", security.LoginPolicies, func(ginContext *gin.Context) string {
+					var payload struct {
+						Email string `json:"email"`
+					}
+					_ = ginContext.ShouldBindBodyWithJSON(&payload)
+					return payload.Email
+				}),
+				TurnstileMiddleware(security.TurnstileSecret),
+				authHandler.Login)
+			authGroup.POST("/login/totp", CSRFMiddleware(true), authHandler.CompleteLoginWithTOTP)
+			authGroup.GET("/mfa/status", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.GetTOTPStatus)
+			authGroup.POST("/mfa/setup", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.GenerateTOTP)
+			authGroup.POST("/mfa/enable", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.EnableTOTP)
+			authGroup.POST("/mfa/disable", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.DisableTOTP)
+			authGroup.POST("/refresh", CSRFMiddleware(true), authHandler.Refresh)
+			authGroup.POST("/logout", CSRFMiddleware(true), authHandler.Logout)
+			authGroup.POST("/logout-everywhere", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.LogoutEverywhere)
+			authGroup.POST("/change-password", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.ChangePassword)
+
+			// Password reset (forgot password) — CSRF + per-IP throttling to
+			// avoid OTP mailbox flooding and code guessing.
+			authGroup.POST("/forgot-password",
+				CSRFMiddleware(true),
+				RateLimitMiddleware(security.RateLimiter, "forgot-password", security.ResetRequestPolicies, nil),
+				authHandler.RequestPasswordReset)
+			authGroup.POST("/verify-reset-otp",
+				CSRFMiddleware(true),
+				RateLimitMiddleware(security.RateLimiter, "verify-reset-otp", security.ResetVerifyPolicies, nil),
+				authHandler.VerifyPasswordResetOTP)
+			authGroup.POST("/reset-password",
+				CSRFMiddleware(true),
+				RateLimitMiddleware(security.RateLimiter, "reset-password", security.ResetVerifyPolicies, nil),
+				authHandler.ResetPassword)
+			authGroup.GET("/me", CSRFMiddleware(true), AuthMiddleware(authUseCase), authHandler.GetCurrentUser)
 		}
 
 		debtGroup := apiGroup.Group("/debts")
-		debtGroup.Use(AuthMiddleware(authUseCase))
+		debtGroup.Use(AuthMiddleware(authUseCase), CSRFMiddleware(false))
 		{
 			// Read operations (available to all authenticated users, scoped by person permissions)
 			debtGroup.GET("/summary", debtHandler.GetDashboardSummary)
@@ -59,7 +118,7 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 		}
 
 		adminGroup := apiGroup.Group("/admin")
-		adminGroup.Use(AuthMiddleware(authUseCase), RequireAdminRole())
+		adminGroup.Use(AuthMiddleware(authUseCase), RequireAdminRole(), CSRFMiddleware(false))
 		{
 			adminGroup.GET("/users", adminHandler.ListUsers)
 			adminGroup.POST("/users", adminHandler.CreateUser)

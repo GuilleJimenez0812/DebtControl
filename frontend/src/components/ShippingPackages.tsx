@@ -64,7 +64,7 @@ export const ShippingPackages: React.FC<ShippingPackagesProps> = ({ packages, la
         </Badge>
       </div>
 
-      {/* Desktop table */}
+      {/* Desktop: macOS table (>md) */}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -101,7 +101,7 @@ export const ShippingPackages: React.FC<ShippingPackagesProps> = ({ packages, la
         </table>
       </div>
 
-      {/* Mobile cards */}
+      {/* Mobile: cards (≤md, ADR-0002) */}
       <div className="md:hidden grid grid-cols-1 gap-3">
         {packages.map((pkg) => (
           <div key={pkg.id} className="rounded-xl border border-line bg-panel p-4 dark:border-line-dark dark:bg-panel">

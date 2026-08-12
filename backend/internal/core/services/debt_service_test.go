@@ -121,19 +121,6 @@ func (fake *fakeDebtRepository) FindAllPackages(_ context.Context) ([]*domain.Sh
 	return packages, nil
 }
 
-func (fake *fakeDebtRepository) FindPackagesByOrderNumber(_ context.Context, orderNumber string) ([]*domain.ShippingPackage, error) {
-	packages := make([]*domain.ShippingPackage, 0)
-	for _, pkg := range fake.packages {
-		if fake.deletedPackages[pkg.ID] {
-			continue
-		}
-		if pkg.OrderNumber == orderNumber {
-			packages = append(packages, pkg)
-		}
-	}
-	return packages, nil
-}
-
 func (fake *fakeDebtRepository) FindPackagesByPurchaseID(_ context.Context, purchaseID string) ([]*domain.ShippingPackage, error) {
 	packages := make([]*domain.ShippingPackage, 0)
 	for _, pkg := range fake.packages {
@@ -172,32 +159,6 @@ func (fake *fakeDebtRepository) SearchOrders(_ context.Context, query string, pe
 	return nil, nil
 }
 
-func (fake *fakeDebtRepository) RecalculateAllBalances(_ context.Context) error {
-	for _, person := range fake.persons {
-		var totalOwed float64
-		for _, purchase := range fake.purchases {
-			if fake.deletedPurchases[purchase.ID] {
-				continue
-			}
-			if purchase.PersonID == person.ID {
-				totalOwed += purchase.TotalCost
-			}
-		}
-
-		var totalPaid float64
-		for _, payment := range fake.payments {
-			if payment.PersonID == person.ID {
-				totalPaid += payment.AmountPaid
-			}
-		}
-
-		person.TotalOwed = totalOwed
-		person.TotalPaid = totalPaid
-		person.RecalculateBalance()
-	}
-	return nil
-}
-
 func (fake *fakeDebtRepository) ResetAllData(_ context.Context) error {
 	return nil
 }
@@ -226,6 +187,7 @@ func (fake *fakeAuditRepository) GetAuditLogs(_ context.Context, _ int, _ int) (
 type fakeUserRepository struct{}
 
 func (fake *fakeUserRepository) Create(_ context.Context, _ *domain.User) error { return nil }
+func (fake *fakeUserRepository) Update(_ context.Context, _ *domain.User) error { return nil }
 func (fake *fakeUserRepository) FindByEmail(_ context.Context, _ string) (*domain.User, error) {
 	return nil, nil
 }
@@ -270,7 +232,7 @@ func newReassignTestHarness(t *testing.T) *reassignTestHarness {
 	adminUser := &domain.User{ID: "admin-1", Email: "admin@example.com", Role: domain.RoleAdmin}
 	ctx := context.WithValue(context.Background(), "user", adminUser)
 
-	service := services.NewDebtService(debtRepo, auditRepo, &fakeUserRepository{})
+	service := services.NewDebtService(debtRepo, auditRepo, &fakeUserRepository{}, debtRepo)
 
 	return &reassignTestHarness{
 		service:   service,
@@ -295,7 +257,7 @@ func TestReassignPurchaseToPerson_MovesOrderAndRecalculatesBothBalances(t *testi
 	paymentB := &domain.PaymentTransaction{ID: "pay-b", PersonID: harness.personB.ID, AmountPaid: 10.0, PaymentDate: time.Now()}
 	require.NoError(t, harness.debtRepo.SavePayment(context.Background(), paymentA))
 	require.NoError(t, harness.debtRepo.SavePayment(context.Background(), paymentB))
-	require.NoError(t, harness.debtRepo.RecalculateAllBalances(context.Background()))
+	require.NoError(t, harness.service.RebalanceAllBalances(context.Background()))
 
 	reassigned, err := harness.service.ReassignPurchaseToPerson(harness.ctx, harness.purchase.ID, harness.personB.ID)
 	require.NoError(t, err)
@@ -322,7 +284,7 @@ func TestReassignPurchaseToPerson_LeavesPaymentsWithOriginalPerson(t *testing.T)
 
 	paymentA := &domain.PaymentTransaction{ID: "pay-a", PersonID: harness.personA.ID, AmountPaid: 80.0, PaymentDate: time.Now()}
 	require.NoError(t, harness.debtRepo.SavePayment(context.Background(), paymentA))
-	require.NoError(t, harness.debtRepo.RecalculateAllBalances(context.Background()))
+	require.NoError(t, harness.service.RebalanceAllBalances(context.Background()))
 
 	_, err := harness.service.ReassignPurchaseToPerson(harness.ctx, harness.purchase.ID, harness.personB.ID)
 	require.NoError(t, err)
@@ -422,7 +384,7 @@ func newDeleteTestHarness(t *testing.T) *deleteTestHarness {
 	adminUser := &domain.User{ID: "admin-1", Email: "admin@example.com", Role: domain.RoleAdmin}
 	ctx := context.WithValue(context.Background(), "user", adminUser)
 
-	service := services.NewDebtService(debtRepo, auditRepo, &fakeUserRepository{})
+	service := services.NewDebtService(debtRepo, auditRepo, &fakeUserRepository{}, debtRepo)
 
 	return &deleteTestHarness{
 		service:  service,
@@ -437,7 +399,7 @@ func newDeleteTestHarness(t *testing.T) *deleteTestHarness {
 
 func TestDeletePurchase_MarksOrderAndAllPackagesDeleted(t *testing.T) {
 	harness := newDeleteTestHarness(t)
-	require.NoError(t, harness.debtRepo.RecalculateAllBalances(context.Background()))
+	require.NoError(t, harness.service.RebalanceAllBalances(context.Background()))
 
 	err := harness.service.DeletePurchase(harness.ctx, harness.purchase.ID)
 	require.NoError(t, err)

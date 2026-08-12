@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from './services/api';
-import type { User, Person, PurchaseItem } from './types';
+import type { User, Person, PurchaseItem, LoginResult } from './types';
 import type { Language } from './i18n/translations';
 import { translations } from './i18n/translations';
 import { TitleBar } from './components/layout/TitleBar';
@@ -12,6 +12,9 @@ import { PurchasesList } from './components/PurchasesList';
 import { ShippingPackages } from './components/ShippingPackages';
 import { PurchaseDetailModal } from './components/PurchaseDetailModal';
 import { AuthModal } from './components/AuthModal';
+import { TOTPSettingsModal } from './components/TOTPSettingsModal';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { ForgotPasswordModal } from './components/ForgotPasswordModal';
 import { AuthWall } from './components/AuthWall';
 import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewPaymentModal } from './components/NewPaymentModal';
@@ -74,6 +77,9 @@ const DashboardContent: React.FC = () => {
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [isAuditLogsOpen, setIsAuditLogsOpen] = useState<boolean>(false);
   const [isUploadInvoiceOpen, setIsUploadInvoiceOpen] = useState<boolean>(false);
+  const [isSecurityOpen, setIsSecurityOpen] = useState<boolean>(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState<boolean>(false);
   const [previewInvoiceUrl, setPreviewInvoiceUrl] = useState<string | null>(null);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState<boolean>(false);
   const [selectedPersonForPayment, setSelectedPersonForPayment] = useState<Person | null>(null);
@@ -88,6 +94,14 @@ const DashboardContent: React.FC = () => {
   useEffect(() => {
     apiService.getCurrentUser().then((fetchedUser) => {
       setUser(fetchedUser);
+    });
+  }, []);
+
+  const [registrationEnabled, setRegistrationEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    apiService.getRegistrationStatus().then((status) => {
+      setRegistrationEnabled(status.registration_enabled);
     });
   }, []);
 
@@ -198,10 +212,21 @@ const DashboardContent: React.FC = () => {
     }
   };
 
-  const handleLogin = async (email: string, pass: string) => {
+  const handleLogin = async (email: string, pass: string): Promise<LoginResult> => {
     const result = await apiService.login(email, pass);
-    setUser(result.user);
+    if (result.mfa_pending) {
+      return result;
+    }
+    setUser(result.user ?? null);
     refetch();
+    return result;
+  };
+
+  const handleCompleteMFA = async (mfaTicket: string, code: string): Promise<LoginResult> => {
+    const result = await apiService.completeLoginWithTOTP(mfaTicket, code);
+    setUser(result.user ?? null);
+    refetch();
+    return result;
   };
 
   const handleRegister = async (email: string, pass: string, name: string) => {
@@ -231,7 +256,8 @@ const DashboardContent: React.FC = () => {
         onOpenAdminModal={() => setIsAdminOpen(true)}
         onOpenAuditLogsModal={() => setIsAuditLogsOpen(true)}
         onOpenUploadInvoiceModal={() => setIsUploadInvoiceOpen(true)}
-        onOpenSecurityModal={() => {}}
+        onOpenSecurityModal={() => setIsSecurityOpen(true)}
+        onOpenChangePasswordModal={() => setIsChangePasswordOpen(true)}
         onLogout={handleLogout}
         onOpenMenu={() => setDrawerOpen(true)}
         onSeedData={() => seedMutation.mutate()}
@@ -370,7 +396,31 @@ const DashboardContent: React.FC = () => {
         language={language}
         onClose={() => setIsAuthOpen(false)}
         onLogin={handleLogin}
+        onCompleteMFA={handleCompleteMFA}
         onRegister={handleRegister}
+        registrationEnabled={registrationEnabled}
+        onForgotPassword={() => {
+          setIsAuthOpen(false);
+          setIsForgotPasswordOpen(true);
+        }}
+      />
+
+      <ForgotPasswordModal
+        isOpen={isForgotPasswordOpen}
+        language={language}
+        onClose={() => setIsForgotPasswordOpen(false)}
+      />
+
+      <TOTPSettingsModal
+        isOpen={isSecurityOpen}
+        language={language}
+        onClose={() => setIsSecurityOpen(false)}
+      />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        language={language}
+        onClose={() => setIsChangePasswordOpen(false)}
       />
 
       <AdminUserModal

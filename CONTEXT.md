@@ -27,3 +27,18 @@ _Avoid_: Transfer, move
 **Logical Delete**:
 Marking a record as deleted (`deleted_at`) without removing the row, purely for traceability. Deleted records are excluded from all reads and balances and are never restorable. Deleting an Order logically deletes its Packages in the same transaction (cascade flows downward only, never to the Person).
 _Avoid_: Soft delete with restore, archive, hard delete
+
+## Security
+
+The security standard (threat model, mitigations, how to report) is the single
+source of truth for hardening DebtControl:
+
+- **Public entry point**: [`SECURITY.md`](SECURITY.md)
+- **Internal standard**: [`docs/sec/README-security-standard.md`](docs/sec/README-security-standard.md)
+- **Decision log**: [`docs/adr/`](docs/adr/) (security decisions 0003–0008)
+- **Pen-test baseline**: [`docs/sec/pen-test-baseline.md`](docs/sec/pen-test-baseline.md)
+
+Scope is **OWASP ASVS L1 / OWASP Top 10**. Notable invariants: secrets fail-hard
+in non-development; registration is closed by default; refunds never move; new
+endpoints touching auth, uploads, or money require a security review per
+[ADR-0003](docs/adr/0003-security-model.md).

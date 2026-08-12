@@ -8,6 +8,8 @@ services:
     plan: free
     region: oregon
     envVars:
+      - key: APP_ENV
+        value: production
       - key: PORT
         value: 8080
       - key: JWT_SECRET
@@ -40,6 +42,14 @@ services:
           type: redis
           name: debtcontrol-redis-dev
           property: port
+      - key: REGISTRATION_ENABLED
+        value: "false"
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: "DebtControl <otp@mail.yourdomain.com>"
+        sync: false
 
   # React Vite Frontend Static Site
   - type: web

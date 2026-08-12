@@ -20,7 +20,7 @@ func NewAdminHandler(adminUseCase ports.AdminUseCase) *AdminHandler {
 
 type CreateUserByAdminRequest struct {
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Password string `json:"password" binding:"required,min=12"`
 	FullName string `json:"full_name" binding:"required"`
 	Role     string `json:"role" binding:"required"`
 }

@@ -1,14 +1,18 @@
 package http
 
 import (
+	"io"
 	"net/http"
 
 	"debtcontrol/backend/internal/core/domain"
 	"debtcontrol/backend/internal/core/ports"
 	errorsAdapter "debtcontrol/backend/pkg/errors"
+	"debtcontrol/backend/pkg/pdf"
 
 	"github.com/gin-gonic/gin"
 )
+
+const pdfMaxInvoiceUploadSize = pdf.MaxInvoiceUploadSize
 
 type DebtHandler struct {
 	debtUseCase ports.DebtUseCase
@@ -227,6 +231,13 @@ func (handler *DebtHandler) UploadInvoice(ginContext *gin.Context) {
 		return
 	}
 
+	// Guard against memory exhaustion before allocating a buffer from the
+	// client-controlled size.
+	if fileHeader.Size > pdfMaxInvoiceUploadSize {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": "invoice file exceeds the 5MB maximum"})
+		return
+	}
+
 	file, err := fileHeader.Open()
 	if err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": "failed to open uploaded file"})
@@ -234,10 +245,18 @@ func (handler *DebtHandler) UploadInvoice(ginContext *gin.Context) {
 	}
 	defer file.Close()
 
-	fileBytes := make([]byte, fileHeader.Size)
-	_, err = file.Read(fileBytes)
+	fileBytes, err := io.ReadAll(io.LimitReader(file, pdf.MaxInvoiceUploadSize+1))
 	if err != nil {
 		ginContext.JSON(http.StatusBadRequest, gin.H{"error": "failed to read uploaded file"})
+		return
+	}
+	if len(fileBytes) > pdf.MaxInvoiceUploadSize {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": "invoice file exceeds the 5MB maximum"})
+		return
+	}
+
+	if err := pdf.ValidateInvoiceUpload(fileHeader.Filename, fileBytes); err != nil {
+		ginContext.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

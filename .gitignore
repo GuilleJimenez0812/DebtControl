@@ -21,3 +21,8 @@ backend/bin/
 .DS_Store
 .vscode/
 .idea/
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/

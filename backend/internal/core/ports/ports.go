@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"debtcontrol/backend/internal/core/domain"
@@ -9,6 +10,7 @@ import (
 
 type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
+	Update(ctx context.Context, user *domain.User) error
 	FindByEmail(ctx context.Context, email string) (*domain.User, error)
 	FindByID(ctx context.Context, id string) (*domain.User, error)
 	FindAll(ctx context.Context) ([]*domain.User, error)
@@ -21,6 +23,17 @@ type UserRepository interface {
 type AuditRepository interface {
 	SaveAuditLog(ctx context.Context, log *domain.AuditLog) error
 	GetAuditLogs(ctx context.Context, limit int, offset int) ([]*domain.AuditLog, error)
+}
+
+type OrderSearcher interface {
+	SearchOrders(ctx context.Context, query string, personIDs []string, limit int) ([]*SearchResult, error)
+}
+
+// EmailSender delivers transactional emails (currently password-reset OTPs).
+// Implementations must be safe to call without a configured provider (a no-op
+// or dev logger) so local dev and tests never need real credentials.
+type EmailSender interface {
+	SendPasswordResetOTP(ctx context.Context, toEmail string, code string) error
 }
 
 type DebtRepository interface {
@@ -38,30 +51,100 @@ type DebtRepository interface {
 	SavePayment(ctx context.Context, payment *domain.PaymentTransaction) error
 
 	FindAllPackages(ctx context.Context) ([]*domain.ShippingPackage, error)
-	FindPackagesByOrderNumber(ctx context.Context, orderNumber string) ([]*domain.ShippingPackage, error)
 	FindPackagesByPurchaseID(ctx context.Context, purchaseID string) ([]*domain.ShippingPackage, error)
 	FindPackageByID(ctx context.Context, id string) (*domain.ShippingPackage, error)
 	SavePackage(ctx context.Context, pkg *domain.ShippingPackage) error
 	DeletePackagesByPurchaseID(ctx context.Context, purchaseID string) error
 
-	SearchOrders(ctx context.Context, query string, personIDs []string, limit int) ([]*SearchResult, error)
-
-	RecalculateAllBalances(ctx context.Context) error
 	ResetAllData(ctx context.Context) error
 	RunInTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
+// SessionStore persists access-token revocation and opaque refresh sessions.
 type SessionStore interface {
+	// --- access token blacklist (existing behaviour) ---
 	StoreSession(ctx context.Context, userID string, tokenID string, expiration time.Duration) error
 	IsSessionBlacklisted(ctx context.Context, tokenID string) (bool, error)
 	InvalidateSession(ctx context.Context, tokenID string, expiration time.Duration) error
+
+	// --- refresh session families (rotation + reuse detection) ---
+	// CreateRefreshSession issues a fresh opaque refresh token for the user and
+	// returns the plaintext token (sent to the client once) and its family id.
+	// Only a hash of the token is ever stored.
+	CreateRefreshSession(ctx context.Context, userID string, expiration time.Duration) (token string, familyID string, err error)
+	// RotateRefreshSession validates the presented opaque token, rotates it to a
+	// new token, and returns the new plaintext (familyID unchanged). If the
+	// presented token was already spent (reuse detected) the whole family is
+	// revoked and ErrRefreshReuse is returned.
+	RefreshSession(ctx context.Context, presentedToken string, expiration time.Duration) (userID string, familyID string, newToken string, err error)
+	// RevokeSession revokes the family owning the presented refresh token (single-device logout).
+	RevokeSession(ctx context.Context, presentedToken string) error
+	// RevokeAllUserSessions revokes every refresh session family of the user (logout-everywhere).
+	RevokeAllUserSessions(ctx context.Context, userID string) error
+
+	// StoreMFAChallenge records a short-lived, single-use MFA login ticket for
+	// the user (used to bridge a verified password to a completed login).
+	StoreMFAChallenge(ctx context.Context, ticket string, userID string, expiration time.Duration) error
+	// ConsumeMFAChallenge atomically redeems the ticket once, returning the
+	// user id. Redeeming an already-spent ticket returns an error.
+	ConsumeMFAChallenge(ctx context.Context, ticket string) (string, error)
+
+	// StorePasswordResetOTP records a short-lived 6-digit reset code keyed by
+	// email, with a limited attempt budget. Codes are redeemed once (single-use).
+	StorePasswordResetOTP(ctx context.Context, email string, code string, maxAttempts int, expiration time.Duration) error
+	// VerifyPasswordResetOTP checks the presented code in constant time. On a
+	// valid code it consumes it (single-use) and returns true, nil. A wrong
+	// code decrements the remaining attempts. A bool=false with nil error means
+	// the code was wrong but the caller may retry; any error means the code can
+	// no longer be used (exhausted, expired, or never issued).
+	VerifyPasswordResetOTP(ctx context.Context, email string, presentedCode string) (valid bool, err error)
+
+	// ResetPasswordTicket mirrors the MFA ticket so a verified OTP can be
+	// exchanged single-use for the actual password update.
+	StorePasswordResetTicket(ctx context.Context, ticket string, email string, expiration time.Duration) error
+	ConsumePasswordResetTicket(ctx context.Context, ticket string) (string, error)
 }
+
+// ErrRefreshReuse signals a previously rotated refresh token was presented again.
+var ErrRefreshReuse = errors.New("refresh token reuse detected, session revoked")
 
 type AuthUseCase interface {
 	Register(ctx context.Context, email string, password string, fullName string) (*domain.User, error)
-	Login(ctx context.Context, email string, password string) (accessToken string, refreshToken string, user *domain.User, err error)
-	Logout(ctx context.Context, tokenID string) error
+	Login(ctx context.Context, email string, password string) (*LoginResult, error)
+	CompleteLoginWithTOTP(ctx context.Context, ticket string, presentedCode string) (*LoginResult, error)
+	Refresh(ctx context.Context, presentedRefreshToken string) (accessToken string, newRefreshToken string, user *domain.User, err error)
+	Logout(ctx context.Context, tokenID string, refreshToken string) error
+	LogoutEverywhere(ctx context.Context, userID string) error
 	ValidateAccessToken(ctx context.Context, tokenString string) (*domain.User, string, error)
+
+	GenerateTOTP(ctx context.Context, userID string) (secret string, provisioningURI string, err error)
+	EnableTOTP(ctx context.Context, userID string, presentedCode string) error
+	DisableTOTP(ctx context.Context, userID string, presentedCode string) error
+	GetTOTPStatus(ctx context.Context, userID string) (enabled bool, err error)
+
+	// ChangePassword verifies the current password, applies the password policy
+	// to the new one, and revokes the user's other sessions.
+	ChangePassword(ctx context.Context, userID string, currentPassword string, newPassword string) error
+
+	// RequestPasswordReset emails a short-lived single-use OTP to the account
+	// (or silently succeeds for unknown emails to avoid enumeration).
+	RequestPasswordReset(ctx context.Context, email string) error
+	// VerifyPasswordResetOTP validates the emailed code and returns a single-use
+	// ticket that unlocks the actual password update.
+	VerifyPasswordResetOTP(ctx context.Context, email string, presentedCode string) (ticket string, err error)
+	// ResetPassword redeems the verified ticket and sets the new password.
+	ResetPassword(ctx context.Context, ticket string, newPassword string) error
+}
+
+// LoginResult captures a successful password check. When MFA is required the
+// service does not yet issue tokens; it returns a short-lived, single-use
+// challenge that the client must redeem with a verified TOTP code.
+type LoginResult struct {
+	User            *domain.User
+	AccessToken     string
+	RefreshToken    string
+	MFAPendingLogin bool
+	MFATicket       string
 }
 
 type UserWithPersons struct {
@@ -77,11 +160,11 @@ type AdminUseCase interface {
 }
 
 type DashboardSummary struct {
-	TotalOutstanding float64                  `json:"total_outstanding"`
-	TotalJuly26      float64                  `json:"total_july_26"`
-	TotalAugust26    float64                  `json:"total_august_26"`
-	Persons          []*domain.Person         `json:"persons"`
-	RecentPurchases  []*domain.PurchaseItem   `json:"recent_purchases"`
+	TotalOutstanding float64                   `json:"total_outstanding"`
+	TotalJuly26      float64                   `json:"total_july_26"`
+	TotalAugust26    float64                   `json:"total_august_26"`
+	Persons          []*domain.Person          `json:"persons"`
+	RecentPurchases  []*domain.PurchaseItem    `json:"recent_purchases"`
 	ShippingPackages []*domain.ShippingPackage `json:"shipping_packages"`
 }
 

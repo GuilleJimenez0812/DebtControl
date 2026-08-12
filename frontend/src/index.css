@@ -123,6 +123,7 @@
     padding: 0 !important;
   }
 
+  /* Flatten panels + cards to readable monochrome */
   .glass-panel,
   .glass-card,
   .mac-vibrancy,
@@ -145,6 +146,7 @@
     color: #111 !important;
   }
 
+  /* Force full table even at card breakpoint; keep text sizes */
   .hidden.md\:block {
     display: block !important;
   }

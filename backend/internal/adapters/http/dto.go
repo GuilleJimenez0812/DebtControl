@@ -2,13 +2,41 @@ package http
 
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Password string `json:"password" binding:"required,min=12"`
 	FullName string `json:"full_name" binding:"required"`
 }
 
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
+}
+
+type MFALoginRequest struct {
+	MFATicket string `json:"mfa_ticket" binding:"required"`
+	Code      string `json:"code" binding:"required,len=6"`
+}
+
+type TOTPCodeRequest struct {
+	Code string `json:"code" binding:"required,len=6"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=12"`
+}
+
+type RequestPasswordResetRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type VerifyPasswordResetOTPRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code  string `json:"code" binding:"required,len=6"`
+}
+
+type ResetPasswordRequest struct {
+	Ticket      string `json:"reset_ticket" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=12"`
 }
 
 type CreatePurchaseRequest struct {

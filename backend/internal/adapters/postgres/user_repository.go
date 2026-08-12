@@ -32,6 +32,8 @@ func (repository *UserRepository) Create(ctx context.Context, user *domain.User)
 		PasswordHash: user.PasswordHash,
 		FullName:     user.FullName,
 		Role:         string(user.Role),
+		TOTPSecret:   user.TOTPSecret,
+		TOTPEnabled:  user.TOTPEnabled,
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
 	}
@@ -43,6 +45,20 @@ func (repository *UserRepository) Create(ctx context.Context, user *domain.User)
 
 	_ = repository.EnsureFirstUserIsAdmin(ctx)
 	return nil
+}
+
+func (repository *UserRepository) Update(ctx context.Context, user *domain.User) error {
+	result := repository.databaseConnection.WithContext(ctx).
+		Model(&UserModel{}).
+		Where("id = ?", user.ID).
+		Updates(map[string]interface{}{
+			"password_hash": user.PasswordHash,
+			"role":          string(user.Role),
+			"totp_secret":   user.TOTPSecret,
+			"totp_enabled":  user.TOTPEnabled,
+			"updated_at":    user.UpdatedAt,
+		})
+	return result.Error
 }
 
 func (repository *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -68,6 +84,8 @@ func (repository *UserRepository) FindByEmail(ctx context.Context, email string)
 		PasswordHash: model.PasswordHash,
 		FullName:     model.FullName,
 		Role:         domain.Role(model.Role),
+		TOTPSecret:   model.TOTPSecret,
+		TOTPEnabled:  model.TOTPEnabled,
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
 	}, nil
@@ -91,6 +109,8 @@ func (repository *UserRepository) FindByID(ctx context.Context, id string) (*dom
 		PasswordHash: model.PasswordHash,
 		FullName:     model.FullName,
 		Role:         domain.Role(model.Role),
+		TOTPSecret:   model.TOTPSecret,
+		TOTPEnabled:  model.TOTPEnabled,
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
 	}, nil
@@ -113,6 +133,8 @@ func (repository *UserRepository) FindAll(ctx context.Context) ([]*domain.User, 
 			PasswordHash: model.PasswordHash,
 			FullName:     model.FullName,
 			Role:         domain.Role(model.Role),
+			TOTPSecret:   model.TOTPSecret,
+			TOTPEnabled:  model.TOTPEnabled,
 			CreatedAt:    model.CreatedAt,
 			UpdatedAt:    model.UpdatedAt,
 		}

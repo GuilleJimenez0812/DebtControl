@@ -161,10 +161,12 @@ func extractTextFromPDF(content []byte) string {
 	defer os.Remove(tmpFile.Name())
 
 	if _, err := tmpFile.Write(content); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fallbackTextExtraction(content)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		return fallbackTextExtraction(content)
+	}
 
 	// Use ledongthuc/pdf to read the PDF
 	f, reader, err := pdfReader.Open(tmpFile.Name())

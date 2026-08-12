@@ -13,6 +13,8 @@ type UserModel struct {
 	PasswordHash string    `gorm:"type:text;not null"`
 	FullName     string    `gorm:"type:text;not null;serializer:encrypted"`
 	Role         string    `gorm:"type:varchar(50);not null;default:'user'"`
+	TOTPSecret   string    `gorm:"type:text;serializer:encrypted"`
+	TOTPEnabled  bool      `gorm:"default:false"`
 	CreatedAt    time.Time `gorm:"autoCreateTime"`
 	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
 }
