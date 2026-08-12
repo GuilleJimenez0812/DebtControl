@@ -19,7 +19,7 @@ interface PurchaseDetailModalProps {
   userRole?: string;
   onClose: () => void;
   onOpenPreviewInvoice?: (url: string) => void;
-  onUploadInvoice?: (file: File) => Promise<{ filename: string; parsed: any }>;
+  onUploadInvoice?: (file: File) => Promise<any>;
   onConfirmAttachInvoice?: (purchaseId: string, invoiceFilename: string, mode: 'replace' | 'append') => Promise<void>;
   onUpdatePurchase: (id: string, payload: { description?: string; item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string }) => Promise<void>;
   onUpdatePackage: (id: string, payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
@@ -203,8 +203,8 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
     setIsUploading(true);
     setActionError('');
     try {
-      const res = await onUploadInvoice(file);
-      await onConfirmAttachInvoice(purchase.id, res.filename, 'append');
+      await onUploadInvoice(file);
+      await onConfirmAttachInvoice(purchase.id, file.name, 'append');
     } catch (error: any) {
       console.error(error);
       setActionError(language === 'es' ? 'Error al subir la factura' : 'Error uploading invoice');
