@@ -124,9 +124,7 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
       if (parsed.order_number) {
         setOrderNumber(parsed.order_number);
       }
-      if (parsed.total_cost > 0) {
-        setItemAmount(parsed.total_cost);
-      } else if (parsed.item_amount > 0) {
+      if (parsed.item_amount > 0) {
         setItemAmount(parsed.item_amount);
       }
       if (parsed.tax_amount >= 0) {
