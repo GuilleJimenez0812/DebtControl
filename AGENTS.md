@@ -30,3 +30,8 @@ Every pull request MUST follow this convention:
   (context, motivation, and outcome), not a bare bullet dump.
 - **Base branch**: `development` unless explicitly told otherwise.
 - Use `gh` CLI for creation and verify the PR URL is returned.
+
+### Git Branching Rules
+
+- **NEVER push to `development` directly**.
+- If you are standing on the `development` branch and receive a new task, you MUST create a new branch (`git checkout -b <branch-name>`) for that task before making any changes.
