@@ -12,7 +12,7 @@ import (
 
 var (
 	memCache      sync.Map
-	idempotencyTTL = 24 * time.Hour
+	idempotencyTTL = 3 * time.Second
 )
 
 // cleanMemCache occasionally removes expired keys
@@ -63,9 +63,13 @@ func IdempotencyMiddleware(redisClient *redis.Client) gin.HandlerFunc {
 		} else {
 			// Fallback to in-memory cache
 			expiryTime := time.Now().Add(idempotencyTTL)
-			if _, loaded := memCache.LoadOrStore(cacheKey, expiryTime); loaded {
-				c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "Duplicate request detected"})
-				return
+			if val, loaded := memCache.LoadOrStore(cacheKey, expiryTime); loaded {
+				if expiry, ok := val.(time.Time); ok && time.Now().Before(expiry) {
+					c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "Duplicate request detected"})
+					return
+				}
+				// If expired, overwrite with new expiry
+				memCache.Store(cacheKey, expiryTime)
 			}
 		}
 
