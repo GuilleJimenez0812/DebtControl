@@ -12,8 +12,8 @@ import (
 const (
 	accessCookieName           = "access_token"
 	refreshCookieName          = "refresh_token"
-	accessCookieMaxAgeSeconds  = 15 * 60
-	refreshCookieMaxAgeSeconds = 7 * 24 * 60 * 60
+	accessCookieMaxAgeSeconds  = 30 * 24 * 60 * 60
+	refreshCookieMaxAgeSeconds = 30 * 24 * 60 * 60
 )
 
 func setAuthCookies(ginContext *gin.Context, accessToken string, refreshToken string) {

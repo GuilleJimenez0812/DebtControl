@@ -25,7 +25,7 @@ func TestPasswordHashingAndVerification(t *testing.T) {
 
 func TestJWTGenerationAndValidation(t *testing.T) {
 	jwtSecret := "super-secret-key-12345"
-	tokenString, tokenID, err := security.GenerateAccessToken("user-123", "user@example.com", "admin", jwtSecret, 15*time.Minute)
+	tokenString, tokenID, err := security.GenerateAccessToken("user-123", "user@example.com", "admin", jwtSecret, 30*24*time.Hour)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tokenString)
