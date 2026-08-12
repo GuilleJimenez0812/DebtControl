@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"debtcontrol/backend/internal/core/domain"
 	"debtcontrol/backend/internal/core/ports"
@@ -84,7 +85,8 @@ func (handler *AuthHandler) Login(ginContext *gin.Context) {
 		return
 	}
 
-	loginResult, err := handler.authUseCase.Login(ginContext.Request.Context(), requestPayload.Email, requestPayload.Password)
+	cleanEmail := strings.ToLower(strings.TrimSpace(requestPayload.Email))
+	loginResult, err := handler.authUseCase.Login(ginContext.Request.Context(), cleanEmail, requestPayload.Password)
 	if err != nil {
 		ginContext.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return

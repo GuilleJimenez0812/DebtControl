@@ -3,8 +3,10 @@ import type { PurchaseItem, ShippingPackage, Person } from '../types';
 import type { Language } from '../i18n/translations';
 import { translations } from '../i18n/translations';
 import { FileText, Edit2, Save, Package, Eye, UserCog, Trash2, Plus } from 'lucide-react';
+import { generateMonthPeriodOptions } from './NewPurchaseModal';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
+import { Select } from './ui/Select';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 
@@ -262,7 +264,12 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
           <div className="grid grid-cols-4 gap-3 pt-2">
             <div>
               <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Periodo' : 'Period'}</label>
-              <Input type="text" value={detailPeriod} onChange={(e) => setDetailPeriod(e.target.value)} className="w-full font-mono" placeholder="Julio-26" />
+              <Select
+                value={detailPeriod}
+                onValueChange={(value) => setDetailPeriod(value)}
+                options={[...generateMonthPeriodOptions().map((opt) => ({ value: opt, label: opt })), { value: 'N/A', label: 'N/A' }]}
+                className="w-full font-mono"
+              />
             </div>
             <div>
               <label className="mb-1 block text-xs text-ink-tertiary dark:text-ink-tertiary-dark">{t.itemAmount}</label>
