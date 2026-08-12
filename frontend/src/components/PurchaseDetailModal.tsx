@@ -6,6 +6,7 @@ import { FileText, Edit2, Save, Package, Eye, UserCog, Trash2, Plus } from 'luci
 import { generateMonthPeriodOptions } from './NewPurchaseModal';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
+import { Select } from './ui/Select';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 
