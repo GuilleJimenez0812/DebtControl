@@ -58,7 +58,7 @@ func CSRFMiddleware(latch bool) gin.HandlerFunc {
 				ginContext.Abort()
 				return
 			}
-			ginContext.SetCookie(csrfCookieName, token, 24*60*60, "/", "", false, false)
+			ginContext.SetCookie(csrfCookieName, token, 30*24*60*60, "/", "", false, false)
 			ginContext.Next()
 			return
 		}

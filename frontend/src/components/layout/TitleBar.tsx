@@ -18,14 +18,6 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
-const TrafficLights: React.FC = () => (
-  <div className="flex items-center gap-2 select-none" aria-hidden>
-    <span className="group relative w-3 h-3 rounded-full bg-[#FF5F57]" />
-    <span className="group relative w-3 h-3 rounded-full bg-[#FEBC2E]" />
-    <span className="group relative w-3 h-3 rounded-full bg-[#28C840]" />
-  </div>
-);
-
 interface TitleBarProps {
   user: User | null;
   language: Language;
@@ -68,7 +60,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
     <header className="mac-vibrancy mac-vibrancy-light dark:mac-vibrancy sticky top-0 z-40 border-b border-line dark:border-line-dark">
       <div className="flex h-11 items-center justify-between gap-3 px-4">
         <div className="flex items-center gap-3 min-w-0">
-          <TrafficLights />
           <span className="text-[13px] font-semibold text-ink dark:text-ink-dark truncate">
             DebtControl
           </span>
