@@ -27,7 +27,8 @@ type SecurityOptions struct {
 	RedisClient         *redis.Client
 }
 
-func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase, allowedOrigins []string, registrationEnabled bool, security SecurityOptions) *gin.Engine {
+func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase,
+	exchangeRateUseCase ports.ExchangeRateUseCase, allowedOrigins []string, registrationEnabled bool, security SecurityOptions) *gin.Engine {
 	routerEngine := gin.Default()
 
 	routerEngine.Use(SecurityHeadersMiddleware())
@@ -41,11 +42,15 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 		MaxAge:           12 * time.Hour,
 	}))
 
+
+
 	authHandler := NewAuthHandler(authUseCase, registrationEnabled)
 	debtHandler := NewDebtHandler(debtUseCase)
 	adminHandler := NewAdminHandler(adminUseCase)
+	exchangeRateHandler := NewExchangeRateHandler(exchangeRateUseCase)
 
 	apiGroup := routerEngine.Group("/api/v1")
+	apiGroup.Static("/uploads", "./uploads")
 	apiGroup.Use(IdempotencyMiddleware(security.RedisClient))
 	if security.RateLimiter != nil && len(security.GlobalPolicies) > 0 {
 		apiGroup.Use(RateLimitMiddleware(security.RateLimiter, "api", security.GlobalPolicies, nil))
@@ -118,6 +123,14 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 			debtGroup.PUT("/packages/:id", RequireAdminRole(), debtHandler.UpdatePackage)
 			debtGroup.POST("/payments", RequireAdminRole(), debtHandler.RecordPayment)
 			debtGroup.POST("/seed", RequireAdminRole(), debtHandler.SeedData)
+		}
+
+		exchangeGroup := apiGroup.Group("/exchange-rates")
+		exchangeGroup.Use(AuthMiddleware(authUseCase), CSRFMiddleware(false))
+		{
+			exchangeGroup.GET("", exchangeRateHandler.GetLatest)
+			exchangeGroup.POST("/fetch", RequireAdminRole(), exchangeRateHandler.FetchBCV)
+			exchangeGroup.POST("/manual", RequireAdminRole(), exchangeRateHandler.SaveManual)
 		}
 
 		adminGroup := apiGroup.Group("/admin")

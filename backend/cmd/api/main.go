@@ -179,7 +179,10 @@ func main() {
 		"ALLOWED_ORIGINS",
 		"http://localhost:5173,http://localhost:3000,https://debtcontrol-1.onrender.com",
 	), ",")
-	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, allowedOrigins, getEnvBoolOrDefault("REGISTRATION_ENABLED", false), securityOptions)
+	exchangeRateRepo := postgresAdapter.NewExchangeRateRepository(databaseConnection)
+	exchangeRateService := services.NewExchangeRateService(exchangeRateRepo)
+
+	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, exchangeRateService, allowedOrigins, getEnvBoolOrDefault("REGISTRATION_ENABLED", false), securityOptions)
 
 	serverPort := getEnvOrDefault("PORT", "8080")
 	log.Printf("Server listening on http://localhost:%s", serverPort)

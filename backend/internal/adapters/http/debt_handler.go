@@ -1,8 +1,12 @@
 package http
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"time"
 
 	"debtcontrol/backend/internal/core/domain"
 	"debtcontrol/backend/internal/core/ports"
@@ -71,6 +75,7 @@ func (handler *DebtHandler) CreatePurchase(ginContext *gin.Context) {
 		requestPayload.ItemAmount,
 		requestPayload.TaxAmount,
 		requestPayload.ShippingCost,
+		requestPayload.InvoiceURL,
 		requestPayload.DetailPeriod,
 	)
 
@@ -262,11 +267,28 @@ func (handler *DebtHandler) UploadInvoice(ginContext *gin.Context) {
 		return
 	}
 
+	// Save the file
+	uploadsDir := filepath.Join("uploads", "invoices")
+	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
+		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create uploads directory"})
+		return
+	}
+
+	uniqueFilename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), fileHeader.Filename)
+	filePath := filepath.Join(uploadsDir, uniqueFilename)
+
+	if err := ginContext.SaveUploadedFile(fileHeader, filePath); err != nil {
+		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save invoice file"})
+		return
+	}
+
 	result, err := handler.debtUseCase.ProcessInvoiceUpload(ginContext.Request.Context(), fileBytes, fileHeader.Filename)
 	if err != nil {
 		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	result.SavedFilename = uniqueFilename
 
 	ginContext.JSON(http.StatusOK, result)
 }

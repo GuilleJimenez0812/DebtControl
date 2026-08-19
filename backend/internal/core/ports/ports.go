@@ -177,6 +177,7 @@ type ParseInvoiceResult struct {
 	TotalCost           float64              `json:"total_cost"`
 	Matched             bool                 `json:"matched"`
 	MatchedPurchaseItem *domain.PurchaseItem `json:"matched_purchase_item,omitempty"`
+	SavedFilename       string               `json:"saved_filename,omitempty"`
 }
 
 type SearchResult struct {
@@ -191,7 +192,7 @@ type SearchResult struct {
 type DebtUseCase interface {
 	GetDashboardSummaryForUser(ctx context.Context, user *domain.User) (*DashboardSummary, error)
 	ListPersonsForUser(ctx context.Context, user *domain.User) ([]*domain.Person, error)
-	CreatePurchaseItem(ctx context.Context, personName string, orderNumber string, description string, amount float64, tax float64, shipping float64, detailPeriod string) (*domain.PurchaseItem, error)
+	CreatePurchaseItem(ctx context.Context, personName string, orderNumber string, description string, amount float64, tax float64, shipping float64, invoiceURL string, detailPeriod string) (*domain.PurchaseItem, error)
 	UpdatePurchaseItem(ctx context.Context, id string, description string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string, detailPeriod string) (*domain.PurchaseItem, error)
 	UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error)
 	CreateShippingPackage(ctx context.Context, purchaseID string, trackingNumber string, shippingCost float64) (*domain.ShippingPackage, error)
@@ -204,4 +205,17 @@ type DebtUseCase interface {
 	SeedInitialSpreadsheetData(ctx context.Context) error
 	ResetAndSeedData(ctx context.Context) error
 	GetAuditLogs(ctx context.Context, limit int, offset int) ([]*domain.AuditLog, error)
+}
+
+
+type ExchangeRateRepository interface {
+	Save(ctx context.Context, rate *domain.ExchangeRate) error
+	GetLatest(ctx context.Context, currency string) (*domain.ExchangeRate, error)
+}
+
+
+type ExchangeRateUseCase interface {
+	FetchAndSaveBCVRates(ctx context.Context) (map[string]*domain.ExchangeRate, error)
+	GetLatestRates(ctx context.Context) (map[string]*domain.ExchangeRate, error)
+	SaveManualRate(ctx context.Context, currency string, rate float64) (*domain.ExchangeRate, error)
 }

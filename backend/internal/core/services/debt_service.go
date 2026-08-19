@@ -196,7 +196,7 @@ func (service *DebtService) GetDashboardSummaryForUser(ctx context.Context, user
 	}, nil
 }
 
-func (service *DebtService) CreatePurchaseItem(ctx context.Context, personName string, orderNumber string, description string, amount float64, tax float64, shipping float64, detailPeriod string) (*domain.PurchaseItem, error) {
+func (service *DebtService) CreatePurchaseItem(ctx context.Context, personName string, orderNumber string, description string, amount float64, tax float64, shipping float64, invoiceURL string, detailPeriod string) (*domain.PurchaseItem, error) {
 	persons, err := service.debtRepo.FindAllPersons(ctx)
 	if err != nil {
 		return nil, err
@@ -219,7 +219,7 @@ func (service *DebtService) CreatePurchaseItem(ctx context.Context, personName s
 	}
 
 	purchaseID := uuid.New().String()
-	newItem, err := domain.NewPurchaseItem(purchaseID, targetPerson.ID, targetPerson.Name, orderNumber, description, amount, tax, shipping, detailPeriod)
+	newItem, err := domain.NewPurchaseItem(purchaseID, targetPerson.ID, targetPerson.Name, orderNumber, description, amount, tax, shipping, invoiceURL, detailPeriod)
 	if err != nil {
 		return nil, err
 	}
