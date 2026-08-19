@@ -137,3 +137,21 @@ type ExchangeRateModel struct {
 func (ExchangeRateModel) TableName() string {
 	return "exchange_rates"
 }
+
+type CatExpenseModel struct {
+	ID             string    `gorm:"primaryKey;type:varchar(64)"`
+	ItemName       string    `gorm:"type:varchar(255);not null"`
+	Platform       string    `gorm:"type:varchar(100);not null"`
+	PaymentMethod  string    `gorm:"type:varchar(100);not null"`
+	AmountUSD      float64   `gorm:"type:numeric(12,4);not null"`
+	AmountVEF      *float64  `gorm:"type:numeric(12,4)"`
+	ExchangeRateID *string   `gorm:"type:varchar(64)"`
+	RegisteredBy   string    `gorm:"type:varchar(64);not null"`
+	ExpenseDate    time.Time `gorm:"index:idx_cat_expenses_date;not null"`
+	CreatedAt      time.Time `gorm:"autoCreateTime"`
+	UpdatedAt      time.Time `gorm:"autoUpdateTime"`
+}
+
+func (CatExpenseModel) TableName() string {
+	return "cat_expenses"
+}
