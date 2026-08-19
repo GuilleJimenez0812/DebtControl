@@ -209,7 +209,7 @@ func TestSecurityHeadersPresentOnEveryResponse(t *testing.T) {
 	router.ServeHTTP(response, request)
 
 	expected := map[string]string{
-		"X-Frame-Options":           "DENY",
+		"X-Frame-Options":           "SAMEORIGIN",
 		"X-Content-Type-Options":    "nosniff",
 		"X-XSS-Protection":          "1; mode=block",
 		"Referrer-Policy":           "strict-origin-when-cross-origin",
