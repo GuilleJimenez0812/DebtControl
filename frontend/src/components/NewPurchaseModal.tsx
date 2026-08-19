@@ -118,8 +118,14 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
     setDragging(false);
     try {
       const parsed = await onUploadInvoice(file);
-      const fileBlob = URL.createObjectURL(file);
-      setAttachedInvoiceUrl(fileBlob);
+      
+      let invoiceUrlToSave = '';
+      if (parsed.saved_filename) {
+        invoiceUrlToSave = parsed.saved_filename;
+      } else {
+        invoiceUrlToSave = URL.createObjectURL(file);
+      }
+      setAttachedInvoiceUrl(invoiceUrlToSave);
 
       if (parsed.order_number) {
         setOrderNumber(parsed.order_number);

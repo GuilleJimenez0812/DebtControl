@@ -64,7 +64,7 @@ func (d *stubDebt) GetDashboardSummaryForUser(ctx context.Context, user *domain.
 func (d *stubDebt) ListPersonsForUser(ctx context.Context, user *domain.User) ([]*domain.Person, error) {
 	return nil, nil
 }
-func (d *stubDebt) CreatePurchaseItem(ctx context.Context, a, b, c string, d1, d2, d3 float64, e string) (*domain.PurchaseItem, error) {
+func (d *stubDebt) CreatePurchaseItem(ctx context.Context, a, b, c string, d1, d2, d3 float64, invUrl, e string) (*domain.PurchaseItem, error) {
 	return nil, nil
 }
 func (d *stubDebt) UpdatePurchaseItem(ctx context.Context, id string, description string, a, b, c float64, inv string, dp string) (*domain.PurchaseItem, error) {
@@ -116,7 +116,7 @@ var _ ports.AdminUseCase = (*stubAdmin)(nil)
 
 func newTestRouter(security httpAdapter.SecurityOptions) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	return httpAdapter.SetupRouter(&stubAuth{loginErr: errLoginFailed}, &stubDebt{}, &stubAdmin{}, []string{"http://localhost:5173"}, false, security)
+	return httpAdapter.SetupRouter(&stubAuth{loginErr: errLoginFailed}, &stubDebt{}, &stubAdmin{}, &stubExchangeRateUseCase{}, []string{"http://localhost:5173"}, false, security)
 }
 
 func doLogin(t *testing.T, router *gin.Engine, ip string, body string) *httptest.ResponseRecorder {
@@ -267,6 +267,18 @@ type testHTTPErr struct{ msg string }
 
 func (e *testHTTPErr) Error() string { return e.msg }
 
+
+type stubExchangeRateUseCase struct{}
+
+func (s *stubExchangeRateUseCase) FetchAndSaveBCVRates(ctx context.Context) (map[string]*domain.ExchangeRate, error) {
+	return nil, nil
+}
+func (s *stubExchangeRateUseCase) GetLatestRates(ctx context.Context) (map[string]*domain.ExchangeRate, error) {
+	return nil, nil
+}
+func (s *stubExchangeRateUseCase) SaveManualRate(ctx context.Context, currency string, rate float64) (*domain.ExchangeRate, error) {
+	return nil, nil
+}
 
 func (s *stubAdmin) AssignModulesToUser(ctx context.Context, userID string, modules []string) error { return nil }
 func (s *stubAdmin) GetAssignedModules(ctx context.Context, userID string) ([]string, error) { return nil, nil }

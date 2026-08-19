@@ -89,6 +89,7 @@ export interface ParseInvoiceResult {
   total_cost: number;
   matched: boolean;
   matched_purchase_item?: PurchaseItem;
+  saved_filename?: string;
 }
 
 export const apiService = {
@@ -195,6 +196,7 @@ export const apiService = {
     item_amount: number;
     tax_amount: number;
     shipping_cost: number;
+    invoice_url?: string;
     detail_period: string;
   }) => {
     const response = await apiClient.post('/debts/purchases', payload);

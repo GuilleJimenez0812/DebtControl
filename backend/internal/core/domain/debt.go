@@ -71,7 +71,7 @@ type PurchaseItem struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
-func NewPurchaseItem(id string, personID string, personName string, orderNumber string, description string, itemAmount float64, taxAmount float64, shippingCost float64, detailPeriod string) (*PurchaseItem, error) {
+func NewPurchaseItem(id string, personID string, personName string, orderNumber string, description string, itemAmount float64, taxAmount float64, shippingCost float64, invoiceURL string, detailPeriod string) (*PurchaseItem, error) {
 	if itemAmount < 0 || taxAmount < 0 || shippingCost < 0 {
 		return nil, ErrInvalidAmount
 	}
@@ -90,7 +90,7 @@ func NewPurchaseItem(id string, personID string, personName string, orderNumber 
 		ShippingCost: shippingCost,
 		TotalCost:    totalCost,
 		DetailPeriod: detailPeriod,
-		InvoiceURL:   "",
+		InvoiceURL:   invoiceURL,
 		CreatedAt:    currentTime,
 		UpdatedAt:    currentTime,
 	}, nil

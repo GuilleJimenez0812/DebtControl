@@ -358,7 +358,10 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                       {cleanName}
                     </span>
                     {onOpenPreviewInvoice && (
-                      <Button size="sm" variant="secondary" onClick={() => onOpenPreviewInvoice(invUrl)}>
+                      <Button size="sm" variant="secondary" onClick={() => {
+                        const finalUrl = invUrl.startsWith('blob:') ? invUrl : `/api/v1/uploads/invoices/${invUrl}`;
+                        onOpenPreviewInvoice(finalUrl);
+                      }}>
                         <Eye className="h-3.5 w-3.5 text-accent" />
                         <span>{language === 'es' ? 'Ver Factura' : 'View Invoice'}</span>
                       </Button>

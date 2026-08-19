@@ -225,7 +225,7 @@ func newReassignTestHarness(t *testing.T) *reassignTestHarness {
 	require.NoError(t, debtRepo.SavePerson(context.Background(), personA))
 	require.NoError(t, debtRepo.SavePerson(context.Background(), personB))
 
-	purchase, err := domain.NewPurchaseItem("order-1", personA.ID, personA.Name, "ORD-100", "Wireless mouse", 80.0, 5.0, 15.0, "Julio-26")
+	purchase, err := domain.NewPurchaseItem("order-1", personA.ID, personA.Name, "ORD-100", "Wireless mouse", 80.0, 5.0, 15.0, "", "Julio-26")
 	require.NoError(t, err)
 	require.NoError(t, debtRepo.SavePurchase(context.Background(), purchase))
 
@@ -249,7 +249,7 @@ func newReassignTestHarness(t *testing.T) *reassignTestHarness {
 func TestReassignPurchaseToPerson_MovesOrderAndRecalculatesBothBalances(t *testing.T) {
 	harness := newReassignTestHarness(t)
 
-	secondOrder, err := domain.NewPurchaseItem("order-2", harness.personB.ID, harness.personB.Name, "ORD-200", "Keyboard", 20.0, 2.0, 8.0, "Julio-26")
+	secondOrder, err := domain.NewPurchaseItem("order-2", harness.personB.ID, harness.personB.Name, "ORD-200", "Keyboard", 20.0, 2.0, 8.0, "", "Julio-26")
 	require.NoError(t, err)
 	require.NoError(t, harness.debtRepo.SavePurchase(context.Background(), secondOrder))
 
@@ -369,7 +369,7 @@ func newDeleteTestHarness(t *testing.T) *deleteTestHarness {
 	person := domain.NewPerson("person-a", "Alice")
 	require.NoError(t, debtRepo.SavePerson(context.Background(), person))
 
-	purchase, err := domain.NewPurchaseItem("order-1", person.ID, person.Name, "ORD-100", "Wireless mouse", 80.0, 5.0, 15.0, "Julio-26")
+	purchase, err := domain.NewPurchaseItem("order-1", person.ID, person.Name, "ORD-100", "Wireless mouse", 80.0, 5.0, 15.0, "", "Julio-26")
 	require.NoError(t, err)
 	require.NoError(t, debtRepo.SavePurchase(context.Background(), purchase))
 

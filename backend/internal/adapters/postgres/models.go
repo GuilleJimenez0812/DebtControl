@@ -125,3 +125,15 @@ type AuditLogModel struct {
 func (AuditLogModel) TableName() string {
 	return "audit_logs"
 }
+
+type ExchangeRateModel struct {
+	ID        string    `gorm:"primaryKey;type:varchar(64)"`
+	Currency  string    `gorm:"index:idx_exchange_rates_currency_created;type:varchar(10);not null"`
+	Rate      float64   `gorm:"type:numeric(10,4);not null"`
+	Source    string    `gorm:"type:varchar(20);not null"`
+	CreatedAt time.Time `gorm:"index:idx_exchange_rates_currency_created;autoCreateTime"`
+}
+
+func (ExchangeRateModel) TableName() string {
+	return "exchange_rates"
+}

@@ -25,6 +25,7 @@ interface UploadInvoiceModalProps {
     item_amount: number;
     tax_amount: number;
     shipping_cost: number;
+    invoice_url: string;
     detail_period: string;
   }) => Promise<void>;
 }
@@ -98,7 +99,7 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
     setLoading(true);
     setError('');
     try {
-      const targetUrl = fileBlobUrl || file.name;
+      const targetUrl = result?.saved_filename || fileBlobUrl || file.name;
       await onConfirmAttach(item.id, targetUrl, attachMode);
       toast('success', t.invoiceAttached);
       onClose();
@@ -110,9 +111,10 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
   };
 
   const handleCreateUnmatchedPurchase = async () => {
-    if (!result || !selectedPerson) return;
+    if (!result || !selectedPerson || !file) return;
     setLoading(true);
     try {
+      const targetUrl = result.saved_filename || fileBlobUrl || file.name;
       await onCreatePurchase({
         person_name: selectedPerson,
         order_number: result.order_number,
@@ -120,6 +122,7 @@ export const UploadInvoiceModal: React.FC<UploadInvoiceModalProps> = ({
         item_amount: result.item_amount,
         tax_amount: result.tax_amount,
         shipping_cost: result.shipping_cost,
+        invoice_url: targetUrl,
         detail_period: detailPeriod,
       });
       toast('success', t.invoiceCreated);
