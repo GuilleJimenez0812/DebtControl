@@ -22,7 +22,7 @@ interface PurchaseDetailModalProps {
   onUploadInvoice?: (file: File) => Promise<any>;
   onConfirmAttachInvoice?: (purchaseId: string, invoiceFilename: string, mode: 'replace' | 'append') => Promise<void>;
   onUpdatePurchase: (id: string, payload: { description?: string; item_amount: number; tax_amount: number; shipping_cost: number; invoice_url?: string; detail_period?: string }) => Promise<void>;
-  onUpdatePackage: (id: string, payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
+  onUpdatePackage: (id: string, payload: { tracking_number: string; shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string }) => Promise<void>;
   onCreatePackage?: (purchaseId: string, trackingNumber: string, shippingCost: number) => Promise<void>;
   onReassignPurchase?: (purchaseId: string, personId: string) => Promise<void>;
   onDeletePurchase?: (purchaseId: string) => Promise<void>;
@@ -59,6 +59,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   const [detailPeriod, setDetailPeriod] = useState<string>(purchase?.detail_period || '');
 
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
+  const [pkgTrackingNumber, setPkgTrackingNumber] = useState<string>('');
   const [pkgShippingCost, setPkgShippingCost] = useState<number>(0);
   const [pkgWarehouse, setPkgWarehouse] = useState<boolean>(false);
   const [pkgPersonally, setPkgPersonally] = useState<boolean>(false);
@@ -129,6 +130,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
 
   const handleStartEditPackage = (pkg: ShippingPackage) => {
     setEditingPkgId(pkg.id);
+    setPkgTrackingNumber(pkg.tracking_number);
     setPkgShippingCost(pkg.shipping_cost);
     setPkgWarehouse(pkg.warehouse_received);
     setPkgPersonally(pkg.personally_received);
@@ -139,6 +141,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
     setIsSubmittingPackage(true);
     try {
       await onUpdatePackage(pkgId, {
+        tracking_number: pkgTrackingNumber.trim(),
         shipping_cost: Number(pkgShippingCost),
         warehouse_received: pkgWarehouse,
         personally_received: pkgPersonally,
@@ -436,7 +439,11 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
                   </div>
                 ) : (
                   <div className="mt-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1 block text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Tracking' : 'Tracking'}</label>
+                        <Input type="text" value={pkgTrackingNumber} onChange={(e) => setPkgTrackingNumber(e.target.value)} className="w-full font-mono" />
+                      </div>
                       <div>
                         <label className="mb-1 block text-ink-tertiary dark:text-ink-tertiary-dark">{language === 'es' ? 'Costo Envío ($)' : 'Shipping Cost ($)'}</label>
                         <Input type="number" step="0.01" value={pkgShippingCost} onChange={(e) => setPkgShippingCost(parseFloat(e.target.value) || 0)} className="w-full font-mono" />

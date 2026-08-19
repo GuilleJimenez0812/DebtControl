@@ -163,6 +163,7 @@ func (handler *DebtHandler) UpdatePackage(ginContext *gin.Context) {
 	pkg, err := handler.debtUseCase.UpdateShippingPackage(
 		ginContext.Request.Context(),
 		id,
+		requestPayload.TrackingNumber,
 		requestPayload.ShippingCost,
 		requestPayload.WarehouseReceived,
 		requestPayload.PersonallyReceived,
