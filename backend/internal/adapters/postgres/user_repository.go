@@ -70,12 +70,18 @@ func (repository *UserRepository) FindByEmail(ctx context.Context, email string)
 	}
 
 	var model UserModel
-	err = repository.databaseConnection.WithContext(ctx).Where("email_hash = ?", emailHash).First(&model).Error
+	err = repository.databaseConnection.WithContext(ctx).Where("email_hash = ?", emailHash).Preload("Modules").First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	
+	modules := make([]string, len(model.Modules))
+	for i, mod := range model.Modules {
+		modules[i] = mod.ModuleName
 	}
 
 	return &domain.User{
@@ -86,6 +92,7 @@ func (repository *UserRepository) FindByEmail(ctx context.Context, email string)
 		Role:         domain.Role(model.Role),
 		TOTPSecret:   model.TOTPSecret,
 		TOTPEnabled:  model.TOTPEnabled,
+		Modules:      modules,
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
 	}, nil
@@ -95,12 +102,18 @@ func (repository *UserRepository) FindByID(ctx context.Context, id string) (*dom
 	_ = repository.EnsureFirstUserIsAdmin(ctx)
 
 	var model UserModel
-	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).First(&model).Error
+	err := repository.databaseConnection.WithContext(ctx).Where("id = ?", id).Preload("Modules").First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	
+	modules := make([]string, len(model.Modules))
+	for i, mod := range model.Modules {
+		modules[i] = mod.ModuleName
 	}
 
 	return &domain.User{
@@ -111,6 +124,7 @@ func (repository *UserRepository) FindByID(ctx context.Context, id string) (*dom
 		Role:         domain.Role(model.Role),
 		TOTPSecret:   model.TOTPSecret,
 		TOTPEnabled:  model.TOTPEnabled,
+		Modules:      modules,
 		CreatedAt:    model.CreatedAt,
 		UpdatedAt:    model.UpdatedAt,
 	}, nil
@@ -120,13 +134,18 @@ func (repository *UserRepository) FindAll(ctx context.Context) ([]*domain.User, 
 	_ = repository.EnsureFirstUserIsAdmin(ctx)
 
 	var models []UserModel
-	err := repository.databaseConnection.WithContext(ctx).Order("created_at ASC").Find(&models).Error
+	err := repository.databaseConnection.WithContext(ctx).Preload("Modules").Order("created_at ASC").Find(&models).Error
 	if err != nil {
 		return nil, err
 	}
 
+
 	users := make([]*domain.User, len(models))
 	for index, model := range models {
+		modules := make([]string, len(model.Modules))
+		for i, mod := range model.Modules {
+			modules[i] = mod.ModuleName
+		}
 		users[index] = &domain.User{
 			ID:           model.ID,
 			Email:        model.Email,
@@ -135,6 +154,7 @@ func (repository *UserRepository) FindAll(ctx context.Context) ([]*domain.User, 
 			Role:         domain.Role(model.Role),
 			TOTPSecret:   model.TOTPSecret,
 			TOTPEnabled:  model.TOTPEnabled,
+		Modules:      modules,
 			CreatedAt:    model.CreatedAt,
 			UpdatedAt:    model.UpdatedAt,
 		}
@@ -150,7 +170,7 @@ func (repository *UserRepository) EnsureFirstUserIsAdmin(ctx context.Context) er
 	}
 
 	var firstUser UserModel
-	err = repository.databaseConnection.WithContext(ctx).Order("created_at ASC").First(&firstUser).Error
+	err = repository.databaseConnection.WithContext(ctx).Order("created_at ASC").Preload("Modules").First(&firstUser).Error
 	if err != nil {
 		return err
 	}
@@ -193,4 +213,37 @@ func (repository *UserRepository) GetAssignedPersonIDs(ctx context.Context, user
 		personIDs[index] = model.PersonID
 	}
 	return personIDs, nil
+}
+
+func (repository *UserRepository) AssignModulesToUser(ctx context.Context, userID string, modules []string) error {
+	return repository.databaseConnection.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", userID).Delete(&UserModuleModel{}).Error; err != nil {
+			return err
+		}
+
+		for _, mod := range modules {
+			userModule := UserModuleModel{
+				UserID:     userID,
+				ModuleName: mod,
+			}
+			if err := tx.Create(&userModule).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (repository *UserRepository) GetAssignedModules(ctx context.Context, userID string) ([]string, error) {
+	var models []UserModuleModel
+	err := repository.databaseConnection.WithContext(ctx).Where("user_id = ?", userID).Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+
+	modules := make([]string, len(models))
+	for index, model := range models {
+		modules[index] = model.ModuleName
+	}
+	return modules, nil
 }

@@ -27,6 +27,7 @@ type User struct {
 	Role         UserRole  `json:"role"`
 	TOTPSecret   string    `json:"-"`
 	TOTPEnabled  bool      `json:"totp_enabled"`
+	Modules      []string  `json:"modules"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -57,6 +58,7 @@ func NewUser(id string, email string, passwordHash string, fullName string, role
 		PasswordHash: passwordHash,
 		FullName:     fullName,
 		Role:         role,
+		Modules:      []string{},
 		CreatedAt:    currentTime,
 		UpdatedAt:    currentTime,
 	}, nil
