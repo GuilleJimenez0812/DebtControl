@@ -223,3 +223,21 @@ type ExchangeRateUseCase interface {
 	GetLatestRates(ctx context.Context) (map[string]*domain.ExchangeRate, error)
 	SaveManualRate(ctx context.Context, currency string, rate float64) (*domain.ExchangeRate, error)
 }
+
+
+type CatExpenseRepository interface {
+	Create(ctx context.Context, expense *domain.CatExpense) error
+	GetByID(ctx context.Context, id string) (*domain.CatExpense, error)
+	List(ctx context.Context, limit, offset int) ([]*domain.CatExpense, error)
+	Update(ctx context.Context, expense *domain.CatExpense) error
+	Delete(ctx context.Context, id string) error
+}
+
+
+type CatExpenseUseCase interface {
+	CreateExpense(ctx context.Context, userID string, expense *domain.CatExpense) error
+	GetExpense(ctx context.Context, id string) (*domain.CatExpense, error)
+	ListExpenses(ctx context.Context, limit, offset int) ([]*domain.CatExpense, error)
+	UpdateExpense(ctx context.Context, expense *domain.CatExpense) error
+	DeleteExpense(ctx context.Context, id string) error
+}

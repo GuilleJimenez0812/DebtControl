@@ -96,6 +96,7 @@ func main() {
 		&postgresAdapter.AuditLogModel{},
 		&postgresAdapter.UserModuleModel{},
 		&postgresAdapter.ExchangeRateModel{},
+		&postgresAdapter.CatExpenseModel{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to execute database migrations: %v", err)
@@ -184,7 +185,12 @@ func main() {
 	exchangeRateRepo := postgresAdapter.NewExchangeRateRepository(databaseConnection)
 	exchangeRateService := services.NewExchangeRateService(exchangeRateRepo)
 
-	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, exchangeRateService, allowedOrigins, getEnvBoolOrDefault("REGISTRATION_ENABLED", false), securityOptions)
+	
+	catExpenseRepo := postgresAdapter.NewCatExpenseRepository(databaseConnection)
+	catExpenseService := services.NewCatExpenseService(catExpenseRepo)
+
+	routerEngine := httpAdapter.SetupRouter(authService, debtService, adminService, exchangeRateService,
+		catExpenseService, allowedOrigins, getEnvBoolOrDefault("REGISTRATION_ENABLED", false), securityOptions)
 
 	serverPort := getEnvOrDefault("PORT", "8080")
 	log.Printf("Server listening on http://localhost:%s", serverPort)

@@ -28,7 +28,8 @@ type SecurityOptions struct {
 }
 
 func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, adminUseCase ports.AdminUseCase,
-	exchangeRateUseCase ports.ExchangeRateUseCase, allowedOrigins []string, registrationEnabled bool, security SecurityOptions) *gin.Engine {
+	exchangeRateUseCase ports.ExchangeRateUseCase,
+	catExpenseUseCase ports.CatExpenseUseCase, allowedOrigins []string, registrationEnabled bool, security SecurityOptions) *gin.Engine {
 	routerEngine := gin.Default()
 
 	routerEngine.Use(SecurityHeadersMiddleware())
@@ -48,6 +49,7 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 	debtHandler := NewDebtHandler(debtUseCase)
 	adminHandler := NewAdminHandler(adminUseCase)
 	exchangeRateHandler := NewExchangeRateHandler(exchangeRateUseCase)
+	catExpenseHandler := NewCatExpenseHandler(catExpenseUseCase)
 
 	apiGroup := routerEngine.Group("/api/v1")
 	apiGroup.Static("/uploads", "./uploads")
@@ -123,6 +125,16 @@ func SetupRouter(authUseCase ports.AuthUseCase, debtUseCase ports.DebtUseCase, a
 			debtGroup.PUT("/packages/:id", RequireAdminRole(), debtHandler.UpdatePackage)
 			debtGroup.POST("/payments", RequireAdminRole(), debtHandler.RecordPayment)
 			debtGroup.POST("/seed", RequireAdminRole(), debtHandler.SeedData)
+		}
+
+		
+		catGroup := apiGroup.Group("/cat-expenses")
+		catGroup.Use(AuthMiddleware(authUseCase), RequireModule("gatos"), CSRFMiddleware(false))
+		{
+			catGroup.GET("", catExpenseHandler.List)
+			catGroup.POST("", catExpenseHandler.Create)
+			catGroup.PUT("/:id", catExpenseHandler.Update)
+			catGroup.DELETE("/:id", catExpenseHandler.Delete)
 		}
 
 		exchangeGroup := apiGroup.Group("/exchange-rates")
