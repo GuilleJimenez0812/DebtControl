@@ -291,12 +291,13 @@ func (service *DebtService) syncPurchaseShippingCost(ctx context.Context, purcha
 	return nil
 }
 
-func (service *DebtService) UpdateShippingPackage(ctx context.Context, id string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error) {
+func (service *DebtService) UpdateShippingPackage(ctx context.Context, id string, trackingNumber string, shippingCost float64, warehouseReceived bool, personallyReceived bool, dispatchDate string) (*domain.ShippingPackage, error) {
 	pkg, err := service.debtRepo.FindPackageByID(ctx, id)
 	if err != nil || pkg == nil {
 		return nil, domain.ErrPackageNotFound
 	}
 
+	pkg.TrackingNumber = trackingNumber
 	pkg.ShippingCost = shippingCost
 	pkg.WarehouseReceived = warehouseReceived
 	pkg.PersonallyReceived = personallyReceived

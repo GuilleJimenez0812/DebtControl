@@ -70,7 +70,7 @@ func (d *stubDebt) CreatePurchaseItem(ctx context.Context, a, b, c string, d1, d
 func (d *stubDebt) UpdatePurchaseItem(ctx context.Context, id string, description string, a, b, c float64, inv string, dp string) (*domain.PurchaseItem, error) {
 	return nil, nil
 }
-func (d *stubDebt) UpdateShippingPackage(ctx context.Context, id string, a float64, b, c bool, dt string) (*domain.ShippingPackage, error) {
+func (d *stubDebt) UpdateShippingPackage(ctx context.Context, id string, tn string, a float64, b, c bool, dt string) (*domain.ShippingPackage, error) {
 	return nil, nil
 }
 func (d *stubDebt) CreateShippingPackage(ctx context.Context, id, tracking string, cost float64) (*domain.ShippingPackage, error) {

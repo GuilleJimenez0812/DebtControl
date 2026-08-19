@@ -65,6 +65,7 @@ type CreatePackageRequest struct {
 }
 
 type UpdatePackageRequest struct {
+	TrackingNumber     string  `json:"tracking_number"`
 	ShippingCost       float64 `json:"shipping_cost" binding:"gte=0"`
 	WarehouseReceived  bool    `json:"warehouse_received"`
 	PersonallyReceived bool    `json:"personally_received"`

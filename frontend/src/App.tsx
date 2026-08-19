@@ -165,7 +165,7 @@ const DashboardContent: React.FC = () => {
   });
 
   const updatePackageMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: { shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string } }) =>
+    mutationFn: ({ id, payload }: { id: string; payload: { tracking_number: string; shipping_cost: number; warehouse_received: boolean; personally_received: boolean; dispatch_date: string } }) =>
       apiService.updatePackage(id, payload),
     onSuccess: () => {
       queryClientInstance.invalidateQueries({ queryKey: ['dashboardSummary'] });
