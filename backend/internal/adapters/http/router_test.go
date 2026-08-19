@@ -279,3 +279,6 @@ func (s *stubExchangeRateUseCase) GetLatestRates(ctx context.Context) (map[strin
 func (s *stubExchangeRateUseCase) SaveManualRate(ctx context.Context, currency string, rate float64) (*domain.ExchangeRate, error) {
 	return nil, nil
 }
+
+func (s *stubAdmin) AssignModulesToUser(ctx context.Context, userID string, modules []string) error { return nil }
+func (s *stubAdmin) GetAssignedModules(ctx context.Context, userID string) ([]string, error) { return nil, nil }

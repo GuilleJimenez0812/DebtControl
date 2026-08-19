@@ -479,3 +479,6 @@ func TestDeletePurchase_EmitsAuditDeleteEntry(t *testing.T) {
 	assert.Contains(t, entry.Details, harness.purchase.OrderNumber)
 	assert.Contains(t, entry.Details, harness.purchase.Description)
 }
+
+func (m *fakeUserRepository) AssignModulesToUser(ctx context.Context, userID string, modules []string) error { return nil }
+func (m *fakeUserRepository) GetAssignedModules(ctx context.Context, userID string) ([]string, error) { return nil, nil }

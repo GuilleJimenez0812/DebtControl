@@ -17,6 +17,8 @@ type UserRepository interface {
 	EnsureFirstUserIsAdmin(ctx context.Context) error
 
 	AssignPersonsToUser(ctx context.Context, userID string, personIDs []string) error
+	AssignModulesToUser(ctx context.Context, userID string, modules []string) error
+	GetAssignedModules(ctx context.Context, userID string) ([]string, error)
 	GetAssignedPersonIDs(ctx context.Context, userID string) ([]string, error)
 }
 
@@ -157,6 +159,8 @@ type AdminUseCase interface {
 	CreateUser(ctx context.Context, email string, password string, fullName string, role string) (*domain.User, error)
 	ListUsersWithPersons(ctx context.Context) ([]*UserWithPersons, error)
 	AssignPersonsToUser(ctx context.Context, userID string, personIDs []string) error
+	AssignModulesToUser(ctx context.Context, userID string, modules []string) error
+	GetAssignedModules(ctx context.Context, userID string) ([]string, error)
 }
 
 type DashboardSummary struct {

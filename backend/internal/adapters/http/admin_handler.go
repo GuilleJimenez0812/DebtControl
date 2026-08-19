@@ -25,6 +25,11 @@ type CreateUserByAdminRequest struct {
 	Role     string `json:"role" binding:"required"`
 }
 
+
+type AssignModulesRequest struct {
+	Modules []string `json:"modules"`
+}
+
 type AssignPersonsRequest struct {
 	PersonIDs []string `json:"person_ids"`
 }
@@ -86,4 +91,22 @@ func (handler *AdminHandler) AssignPersons(ginContext *gin.Context) {
 	ginContext.JSON(http.StatusOK, gin.H{
 		"message": "person access permissions assigned successfully",
 	})
+}
+
+
+func (h *AdminHandler) AssignModules(c *gin.Context) {
+	userID := c.Param("id")
+	var req AssignModulesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid request format"})
+		return
+	}
+
+	err := h.adminUseCase.AssignModulesToUser(c.Request.Context(), userID, req.Modules)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to assign modules"})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "Modules assigned successfully"})
 }

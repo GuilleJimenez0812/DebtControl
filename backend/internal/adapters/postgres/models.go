@@ -15,8 +15,9 @@ type UserModel struct {
 	Role         string    `gorm:"type:varchar(50);not null;default:'user'"`
 	TOTPSecret   string    `gorm:"type:text;serializer:encrypted"`
 	TOTPEnabled  bool      `gorm:"default:false"`
-	CreatedAt    time.Time `gorm:"autoCreateTime"`
-	UpdatedAt    time.Time `gorm:"autoUpdateTime"`
+	CreatedAt    time.Time         `gorm:"autoCreateTime"`
+	UpdatedAt    time.Time         `gorm:"autoUpdateTime"`
+	Modules      []UserModuleModel `gorm:"foreignKey:UserID"`
 }
 
 func (UserModel) TableName() string {
@@ -31,6 +32,15 @@ type UserPersonModel struct {
 
 func (UserPersonModel) TableName() string {
 	return "user_persons"
+}
+
+type UserModuleModel struct {
+	UserID     string `gorm:"primaryKey;type:varchar(64);not null"`
+	ModuleName string `gorm:"primaryKey;type:varchar(50);not null"`
+}
+
+func (UserModuleModel) TableName() string {
+	return "user_modules"
 }
 
 type PersonModel struct {
