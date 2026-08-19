@@ -64,7 +64,7 @@ func (d *stubDebt) GetDashboardSummaryForUser(ctx context.Context, user *domain.
 func (d *stubDebt) ListPersonsForUser(ctx context.Context, user *domain.User) ([]*domain.Person, error) {
 	return nil, nil
 }
-func (d *stubDebt) CreatePurchaseItem(ctx context.Context, a, b, c string, d1, d2, d3 float64, e string) (*domain.PurchaseItem, error) {
+func (d *stubDebt) CreatePurchaseItem(ctx context.Context, a, b, c string, d1, d2, d3 float64, invUrl, e string) (*domain.PurchaseItem, error) {
 	return nil, nil
 }
 func (d *stubDebt) UpdatePurchaseItem(ctx context.Context, id string, description string, a, b, c float64, inv string, dp string) (*domain.PurchaseItem, error) {

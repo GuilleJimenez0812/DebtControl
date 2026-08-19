@@ -39,6 +39,7 @@ func TestNewPurchaseItemCalculation(t *testing.T) {
 		18.73,
 		1.23,
 		5.50,
+		"",
 		"Julio-26",
 	)
 

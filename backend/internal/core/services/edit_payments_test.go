@@ -25,7 +25,7 @@ func TestUpdatePurchaseItem_DoesNotWipeOrphanedPersonPayments(t *testing.T) {
 	p.TotalPaid = 7.95
 	require.NoError(t, repo.SavePerson(context.Background(), p))
 
-	order, err := domain.NewPurchaseItem("o1", p.ID, p.Name, "Aparato", "Aparato", 100.0, 6.5, 10.0, "Julio-26")
+	order, err := domain.NewPurchaseItem("o1", p.ID, p.Name, "Aparato", "Aparato", 100.0, 6.5, 10.0, "", "Julio-26")
 	require.NoError(t, err)
 	require.NoError(t, repo.SavePurchase(context.Background(), order))
 
