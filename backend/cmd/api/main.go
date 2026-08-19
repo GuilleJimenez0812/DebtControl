@@ -96,6 +96,7 @@ func main() {
 		&postgresAdapter.AuditLogModel{},
 		&postgresAdapter.UserModuleModel{},
 		&postgresAdapter.ExchangeRateModel{},
+		&postgresAdapter.CatExpenseModel{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to execute database migrations: %v", err)
