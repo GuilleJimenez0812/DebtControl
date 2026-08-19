@@ -269,7 +269,7 @@ func (handler *DebtHandler) UploadInvoice(ginContext *gin.Context) {
 
 	// Save the file
 	uploadsDir := filepath.Join("uploads", "invoices")
-	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
+	if err := os.MkdirAll(uploadsDir, 0750); err != nil {
 		ginContext.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create uploads directory"})
 		return
 	}

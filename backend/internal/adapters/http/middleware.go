@@ -137,7 +137,7 @@ func RequireAdminRole() gin.HandlerFunc {
 
 func SecurityHeadersMiddleware() gin.HandlerFunc {
 	return func(ginContext *gin.Context) {
-		ginContext.Header("X-Frame-Options", "DENY")
+		ginContext.Header("X-Frame-Options", "SAMEORIGIN")
 		ginContext.Header("X-Content-Type-Options", "nosniff")
 		ginContext.Header("X-XSS-Protection", "1; mode=block")
 		ginContext.Header("Referrer-Policy", "strict-origin-when-cross-origin")
