@@ -80,8 +80,10 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
       setRole('user');
       setActiveTab('list');
       toast('success', t.userCreated);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.message) {
+    } catch (err: any) {
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else if (err instanceof Error && err.message) {
         setError(err.message);
       } else {
         setError(t.failedCreateUser);
@@ -236,7 +238,7 @@ export const AdminUserModal: React.FC<AdminUserModalProps> = ({
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-ink-secondary dark:text-ink-secondary-dark">{t.password}</label>
-            <Input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full" />
+            <Input type="password" required minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••••••" className="w-full" />
           </div>
 
           <div>

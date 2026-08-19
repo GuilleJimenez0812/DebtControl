@@ -71,12 +71,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // Live validation
   const emailFieldError = email !== '' && !emailValid(email) ? t.invalidEmail : '';
-  const passwordFieldError = password !== '' && password.length < 8 ? t.passwordTooShort : '';
+  const passwordFieldError = password !== '' && password.length < 12 ? t.passwordTooShort : '';
   const nameFieldError = isRegisterMode && fullName.trim() === '' ? t.nameRequired : '';
   const totpFieldError = totpCode.length > 0 && totpCode.length !== 6 ? t.invalidCode : '';
   const hasFieldErrors =
     (email !== '' && !emailValid(email)) ||
-    (password !== '' && password.length < 8) ||
+    (password !== '' && password.length < 12) ||
     (isRegisterMode && fullName.trim() === '') ||
     (mfaTicket.length > 0 && totpCode.length !== 6);
 
@@ -96,8 +96,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
       onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error && err.message ? err.message : t.authFailed);
+    } catch (err: any) {
+      setError(err.response?.data?.error || (err instanceof Error && err.message ? err.message : t.authFailed));
     } finally {
       setLoading(false);
     }
@@ -112,8 +112,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       await onCompleteMFA(mfaTicket, totpCode);
       onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error && err.message ? err.message : t.invalidCode);
+    } catch (err: any) {
+      setError(err.response?.data?.error || (err instanceof Error && err.message ? err.message : t.invalidCode));
     } finally {
       setLoading(false);
     }
@@ -128,8 +128,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       await onRegister(email, password, fullName.trim());
       onClose();
-    } catch (err: unknown) {
-      setError(err instanceof Error && err.message ? err.message : t.authFailed);
+    } catch (err: any) {
+      setError(err.response?.data?.error || (err instanceof Error && err.message ? err.message : t.authFailed));
     } finally {
       setLoading(false);
     }
@@ -276,7 +276,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <Input
                       type={showPassword ? 'text' : 'password'}
                       required
-                      minLength={8}
+                      minLength={12}
                       autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
