@@ -116,7 +116,7 @@ var _ ports.AdminUseCase = (*stubAdmin)(nil)
 
 func newTestRouter(security httpAdapter.SecurityOptions) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	return httpAdapter.SetupRouter(&stubAuth{loginErr: errLoginFailed}, &stubDebt{}, &stubAdmin{}, &stubExchangeRateUseCase{}, []string{"http://localhost:5173"}, false, security)
+	return httpAdapter.SetupRouter(&stubAuth{loginErr: errLoginFailed}, &stubDebt{}, &stubAdmin{}, &stubExchangeRateUseCase{}, &stubCatExpenseUseCase{}, []string{"http://localhost:5173"}, false, security)
 }
 
 func doLogin(t *testing.T, router *gin.Engine, ip string, body string) *httptest.ResponseRecorder {
@@ -282,3 +282,22 @@ func (s *stubExchangeRateUseCase) SaveManualRate(ctx context.Context, currency s
 
 func (s *stubAdmin) AssignModulesToUser(ctx context.Context, userID string, modules []string) error { return nil }
 func (s *stubAdmin) GetAssignedModules(ctx context.Context, userID string) ([]string, error) { return nil, nil }
+
+
+type stubCatExpenseUseCase struct{}
+
+func (s *stubCatExpenseUseCase) CreateExpense(ctx context.Context, userID string, expense *domain.CatExpense) error {
+	return nil
+}
+func (s *stubCatExpenseUseCase) GetExpense(ctx context.Context, id string) (*domain.CatExpense, error) {
+	return nil, nil
+}
+func (s *stubCatExpenseUseCase) ListExpenses(ctx context.Context, limit, offset int) ([]*domain.CatExpense, error) {
+	return nil, nil
+}
+func (s *stubCatExpenseUseCase) UpdateExpense(ctx context.Context, expense *domain.CatExpense) error {
+	return nil
+}
+func (s *stubCatExpenseUseCase) DeleteExpense(ctx context.Context, id string) error {
+	return nil
+}
