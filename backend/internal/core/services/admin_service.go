@@ -99,3 +99,21 @@ func (service *AdminService) AssignPersonsToUser(ctx context.Context, userID str
 
 	return service.userRepo.AssignPersonsToUser(ctx, userID, personIDs)
 }
+
+
+func (s *AdminService) AssignModulesToUser(ctx context.Context, userID string, modules []string) error {
+	_, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return s.userRepo.AssignModulesToUser(ctx, userID, modules)
+}
+
+
+func (s *AdminService) GetAssignedModules(ctx context.Context, userID string) ([]string, error) {
+	_, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.userRepo.GetAssignedModules(ctx, userID)
+}

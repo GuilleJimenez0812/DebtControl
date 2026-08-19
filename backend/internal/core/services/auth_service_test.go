@@ -536,3 +536,6 @@ func TestResetPasswordRejectsWeakPolicy(t *testing.T) {
 	err = svc.ResetPassword(context.Background(), ticket, "short")
 	assert.ErrorIs(t, err, security.ErrPasswordTooShort)
 }
+
+func (m *fakeUserRepo) AssignModulesToUser(ctx context.Context, userID string, modules []string) error { return nil }
+func (m *fakeUserRepo) GetAssignedModules(ctx context.Context, userID string) ([]string, error) { return nil, nil }

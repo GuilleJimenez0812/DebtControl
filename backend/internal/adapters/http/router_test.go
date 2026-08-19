@@ -266,3 +266,7 @@ var errLoginFailed = &testHTTPErr{"invalid email or password"}
 type testHTTPErr struct{ msg string }
 
 func (e *testHTTPErr) Error() string { return e.msg }
+
+
+func (s *stubAdmin) AssignModulesToUser(ctx context.Context, userID string, modules []string) error { return nil }
+func (s *stubAdmin) GetAssignedModules(ctx context.Context, userID string) ([]string, error) { return nil, nil }
