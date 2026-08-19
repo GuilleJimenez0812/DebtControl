@@ -94,6 +94,8 @@ func main() {
 		&postgresAdapter.PaymentTransactionModel{},
 		&postgresAdapter.ShippingPackageModel{},
 		&postgresAdapter.AuditLogModel{},
+		&postgresAdapter.UserModuleModel{},
+		&postgresAdapter.ExchangeRateModel{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to execute database migrations: %v", err)
