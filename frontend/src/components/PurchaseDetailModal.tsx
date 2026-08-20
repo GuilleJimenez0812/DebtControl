@@ -100,7 +100,7 @@ export const PurchaseDetailModal: React.FC<PurchaseDetailModalProps> = ({
   if (!isOpen || !purchase) return null;
 
   const relatedPackages = packages.filter(
-    (pkg) => pkg.order_number === purchase.order_number || (purchase.description && pkg.item_description && pkg.item_description.includes(purchase.description))
+    (pkg) => pkg.order_number === purchase.order_number
   );
 
   const attachedInvoices = purchase.invoice_url
