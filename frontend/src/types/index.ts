@@ -5,6 +5,7 @@ export interface User {
   email: string;
   full_name: string;
   role: string;
+  modules: string[];
   totp_enabled: boolean;
   created_at: string;
   updated_at: string;
@@ -76,3 +77,18 @@ export interface DashboardSummary {
   recent_purchases: PurchaseItem[];
   shipping_packages: ShippingPackage[];
 }
+
+export interface CatExpense {
+  id: string;
+  item_name: string;
+  platform: string;
+  payment_method: string;
+  amount_usd: number;
+  amount_vef: number;
+  exchange_rate_id?: string;
+  expense_date: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
