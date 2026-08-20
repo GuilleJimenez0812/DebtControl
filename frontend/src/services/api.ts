@@ -299,4 +299,25 @@ export const apiService = {
     const response = await apiClient.get<{ logs: any[] }>(`/admin/audit-logs?limit=${limit}&offset=${offset}`);
     return response.data;
   },
+  // Cat Expenses
+  getCatExpenses: async (): Promise<import('../types').CatExpense[]> => {
+    const response = await apiClient.get('/cat-expenses');
+    return response.data.expenses || [];
+  },
+  createCatExpense: async (payload: Partial<import('../types').CatExpense>) => {
+    const response = await apiClient.post('/cat-expenses', payload);
+    return response.data;
+  },
+  updateCatExpense: async (id: string, payload: Partial<import('../types').CatExpense>) => {
+    const response = await apiClient.put(`/cat-expenses/${id}`, payload);
+    return response.data;
+  },
+  deleteCatExpense: async (id: string) => {
+    await apiClient.delete(`/cat-expenses/${id}`);
+  },
+  // Exchange Rates
+  getExchangeRates: async () => {
+    const response = await apiClient.get('/exchange-rates');
+    return response.data.rates || [];
+  },
 };

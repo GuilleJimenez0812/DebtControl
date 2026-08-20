@@ -6,6 +6,7 @@ import type { Language } from './i18n/translations';
 import { translations } from './i18n/translations';
 import { TitleBar } from './components/layout/TitleBar';
 import { Sidebar, type NavKey } from './components/layout/Sidebar';
+import { CatExpensesPage } from './components/CatExpensesPage';
 import { SummaryCards } from './components/SummaryCards';
 import { DebtTable } from './components/DebtTable';
 import { PurchasesList } from './components/PurchasesList';
@@ -68,7 +69,7 @@ const DashboardContent: React.FC = () => {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<'debts' | 'purchases'>('debts');
+  const [activeTab, setActiveTab] = useState<NavKey>('debts');
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [selectedPersonFilter, setSelectedPersonFilter] = useState<string>('All');
   const [selectedPeriodFilter, setSelectedPeriodFilter] = useState<string>('All');
@@ -281,6 +282,10 @@ const DashboardContent: React.FC = () => {
             <AuthWall language={language} onOpenAuthModal={() => setIsAuthOpen(true)} />
           ) : (
             <>
+              {activeTab === 'cats' ? (
+                <CatExpensesPage user={user} language={language} />
+              ) : (
+                <>
               <SummaryCards
                 persons={summary?.persons || []}
                 totalOutstanding={summary?.total_outstanding || 0}
@@ -348,6 +353,8 @@ const DashboardContent: React.FC = () => {
 <ShippingPackages packages={summary?.shipping_packages || []} language={language} />
                     </>
                   )}
+                </>
+              )}
                 </>
               )}
             </>

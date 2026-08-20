@@ -1,14 +1,15 @@
 import React from 'react';
-import { Layers, ShoppingBag, CreditCard, FileUp, Users, ShieldCheck, X, ChevronRight } from 'lucide-react';
+import { Cat, Layers, ShoppingBag, CreditCard, FileUp, Users, ShieldCheck, X, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-export type NavKey = 'debts' | 'purchases' | 'payments' | 'invoices';
+export type NavKey = 'debts' | 'purchases' | 'payments' | 'invoices' | 'cats';
 
 interface SidebarProps {
   active: NavKey;
   onNavigate: (key: NavKey) => void;
   isAdmin: boolean;
+  userModules?: string[];
   onOpenAdminModal: () => void;
   onOpenAuditLogsModal: () => void;
   onOpenUploadInvoiceModal: () => void;
@@ -24,7 +25,7 @@ interface NavItem {
   es: string;
 }
 
-const NAV: NavItem[] = [
+const BASE_NAV: NavItem[] = [
   { key: 'debts', icon: <Layers className="h-4 w-4" />, label: 'Debts', es: 'Deudas' },
   { key: 'purchases', icon: <ShoppingBag className="h-4 w-4" />, label: 'Purchases', es: 'Compras' },
   { key: 'payments', icon: <CreditCard className="h-4 w-4" />, label: 'Payments', es: 'Pagos' },
@@ -35,6 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   active,
   onNavigate,
   isAdmin,
+  userModules = [],
   onOpenAdminModal,
   onOpenAuditLogsModal,
   onOpenUploadInvoiceModal,
@@ -60,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <nav className={clsx('flex h-full flex-col gap-1 p-2', className)} aria-label="Main">
-      {NAV.map((item) => (
+      {[...BASE_NAV, ...(userModules?.includes('gatos') ? [{ key: 'cats' as NavKey, icon: <Cat className="h-4 w-4" />, label: 'Cats', es: 'Gatos' }] : [])].map((item) => (
         <button key={item.key} onClick={() => click(() => onNavigate(item.key))} className={itemCls(active === item.key)} title={item.es}>
           {item.icon}
           {!compact && <span>{item.es}</span>}

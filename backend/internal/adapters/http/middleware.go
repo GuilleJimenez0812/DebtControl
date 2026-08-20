@@ -231,3 +231,33 @@ func RateLimitMiddleware(limiter *ratelimit.Limiter, scope string, policies []ra
 		ginContext.Next()
 	}
 }
+
+
+func RequireModule(moduleName string) gin.HandlerFunc {
+	return func(ginContext *gin.Context) {
+		currentUser, exists := ginContext.Get("user")
+		if !exists {
+			ginContext.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized access"})
+			ginContext.Abort()
+			return
+		}
+
+		userEntity := currentUser.(*domain.User)
+
+		hasModule := false
+		for _, m := range userEntity.Modules {
+			if m == moduleName {
+				hasModule = true
+				break
+			}
+		}
+
+		if !hasModule && userEntity.Role != domain.RoleAdmin {
+			ginContext.JSON(http.StatusForbidden, gin.H{"error": "module access denied"})
+			ginContext.Abort()
+			return
+		}
+
+		ginContext.Next()
+	}
+}
